@@ -6,5 +6,5 @@ type SinkServer struct {
 }
 
 func NewSinkServer(option *Option) (server *SinkServer) {
-
+	return nil
 }
