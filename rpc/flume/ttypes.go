@@ -181,7 +181,7 @@ func (p *ThriftFlumeEvent) writeField1(oprot thrift.TProtocol) (err error) {
 
 func (p *ThriftFlumeEvent) writeField2(oprot thrift.TProtocol) (err error) {
 	if p.Body != nil {
-		if err := oprot.WriteFieldBegin("body", thrift.BINARY, 2); err != nil {
+		if err := oprot.WriteFieldBegin("body", thrift.STRING, 2); err != nil {
 			return fmt.Errorf("%T write field begin error 2:body: %s", p, err)
 		}
 		if err := oprot.WriteBinary(p.Body); err != nil {

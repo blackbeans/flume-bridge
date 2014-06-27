@@ -19,12 +19,11 @@ const (
 )
 
 type flumeClient struct {
-	host             string
-	port             int
-	bodyProtoFactory *thrift.TCompactProtocolFactory
-	transport        *thrift.TFramedTransport
-	client           *flume.ThriftSourceProtocolClient
-	status           Status //连接状态
+	host      string
+	port      int
+	transport thrift.TTransport
+	client    *flume.ThriftSourceProtocolClient
+	status    Status //连接状态
 }
 
 func NewFlumeClient(host string, port int) *flumeClient {
@@ -48,13 +47,15 @@ func (self *flumeClient) connect() {
 		os.Exit(-1)
 	}
 
-	self.transport = thrift.NewTFramedTransport(tsocket)
+	transportFactory := thrift.NewTFramedTransportFactory(thrift.NewTTransportFactory())
+
+	//TLV 方式传输
 	protocolFactory := thrift.NewTCompactProtocolFactory()
+
+	//使用非阻塞io来传输
+	self.transport = transportFactory.GetTransport(tsocket)
+
 	self.client = flume.NewThriftSourceProtocolClientFactory(self.transport, protocolFactory)
-
-	//body 序列化方式
-
-	self.bodyProtoFactory = thrift.NewTCompactProtocolFactory()
 
 	if err := self.transport.Open(); nil != err {
 		log.Panic(err)
@@ -64,26 +65,16 @@ func (self *flumeClient) connect() {
 	self.status = STATUS_READY
 }
 
-func (self *flumeClient) append(header map[string]string, body string) error {
+func (self *flumeClient) append(header map[string]string, body []byte) error {
 
-	buff := thrift.NewTMemoryBufferLen(len(body))
-
-	defer buff.Close()
-
-	_, err := buff.WriteString(body)
-	if nil != err {
-		return errors.New("body convert to byte array fail")
-	}
-
+	var err error
 	event := flume.NewThriftFlumeEvent()
 	event.Headers = header
-	event.Body = buff.Bytes()
-	// protocol := self.bodyProtoFactory.GetProtocol(buff)
-	// err = event.Write(protocol)
-	if nil != err {
-		return errors.New("body serilized body fail |" + err.Error())
-	}
+	event.Body = body
 
+	if nil != err {
+		return err
+	}
 	ch := make(chan flume.Status, 1)
 
 	go func(ch chan flume.Status) {
