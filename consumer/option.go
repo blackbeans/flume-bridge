@@ -1,17 +1,35 @@
 package consumer
 
-//启动设置的选项
-type Option struct {
-	flumeHostName string
-
-	flumePort int32
-
-	host string
-
-	port int32
+type HostPort struct {
+	Host string
+	Port int
 }
 
-func NewOption(flumeHostName string, flumePort int32, host string, port int32) *Option {
+type QueueHostPort struct {
+	HostPort
+	QueueName string
 
-	return &Option{flumeHostName: flumeHostName, flumePort: flumePort, host: host, port: port}
+	Maxconn int
+
+	Timeout int
+}
+
+//启动设置的选项
+type Option struct {
+	flumeAgents []HostPort
+
+	queueHostPorts []QueueHostPort //redis队列Pop
+
+}
+
+func NewOption(flumeAgents []HostPort, hostPorts []QueueHostPort) *Option {
+
+	return &Option{flumeAgents: flumeAgents, queueHostPorts: hostPorts}
+}
+
+//command
+type command struct {
+	Action string `json:"action"`
+
+	Params map[string]string `json:"params"`
 }

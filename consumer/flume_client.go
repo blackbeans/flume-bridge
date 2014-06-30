@@ -26,7 +26,7 @@ type flumeClient struct {
 	status    Status //连接状态
 }
 
-func NewFlumeClient(host string, port int) *flumeClient {
+func newFlumeClient(host string, port int) *flumeClient {
 
 	return &flumeClient{host: host, port: port, status: STATUS_INIT}
 
