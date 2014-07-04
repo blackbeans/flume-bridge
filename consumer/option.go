@@ -1,5 +1,10 @@
 package consumer
 
+import (
+	"strconv"
+	"strings"
+)
+
 type HostPort struct {
 	Host string
 	Port int
@@ -12,6 +17,12 @@ type QueueHostPort struct {
 	Maxconn int
 
 	Timeout int
+}
+
+func NewHostPort(hp string) HostPort {
+	hparr := strings.Split(hp, ":")
+	port, _ := strconv.Atoi(hparr[1])
+	return HostPort{Host: hparr[0], Port: port}
 }
 
 //启动设置的选项
@@ -31,5 +42,5 @@ func NewOption(flumeAgents []HostPort, hostPorts []QueueHostPort) *Option {
 type command struct {
 	Action string `json:"action"`
 
-	Params map[string]string `json:"params"`
+	Params map[string]interface{} `json:"params"`
 }

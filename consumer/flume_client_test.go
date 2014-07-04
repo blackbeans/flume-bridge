@@ -7,7 +7,7 @@ import (
 )
 
 func TestFlumeClient(t *testing.T) {
-	client := newFlumeClient("localhost", 61111)
+	client := newFlumeClient("localhost", 44444)
 	client.connect()
 	innerTest(client, t)
 	defer client.destory()
@@ -58,7 +58,7 @@ func innerTest(client *flumeClient, t testing.TB) {
 }
 
 func BenchmarkFlumeClient(t *testing.B) {
-	client := newFlumeClient("localhost", 61111)
+	client := newFlumeClient("localhost", 44444)
 	client.connect()
 	for i := 0; i < t.N; i++ {
 		innerTest(client, t)
