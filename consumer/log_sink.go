@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/blackbeans/redigo/redis"
 	"log"
+	"math/rand"
 	_ "os"
 	"strconv"
 	"time"
@@ -65,8 +66,8 @@ func NewSinkServer(option *Option) (server *SinkServer) {
 
 //启动pop
 func (self *SinkServer) Start() {
-	self.isStop = false
 
+	self.isStop = false
 	ch := make(chan int, 1)
 	var count = 0
 	for k, v := range self.redisPool {
@@ -94,15 +95,15 @@ func (self *SinkServer) Start() {
 						continue
 					}
 
-					pool.Release(conn)
-
 					resp := reply.([]byte)
 					var cmd command
 					err = json.Unmarshal(resp, &cmd)
 
 					if nil != err {
-						log.Println("command unmarshal fail ! %s | error:%s", resp, err.Error())
+						log.Printf("command unmarshal fail ! %s | error:%s\n", resp, err.Error())
 						continue
+					} else if rand.Int()%10 == 0 {
+						log.Println("trace|command|%s", cmd)
 					}
 
 					//
