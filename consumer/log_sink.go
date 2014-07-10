@@ -80,7 +80,7 @@ func (self *SinkServer) Start() {
 				defer pool.Release(conn)
 				for !self.isStop {
 
-					log.Println("pool active count :", strconv.Itoa(pool.ActiveCount()))
+					// log.Println("pool active count :", strconv.Itoa(pool.ActiveCount()))
 					reply, err := conn.Do("LPOP", queuename)
 					if nil != err || nil == reply {
 						if nil != err {
