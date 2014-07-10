@@ -77,7 +77,7 @@ func (self *SinkServer) Start() {
 			defer pool.Close()
 			go func(queuename string, pool *redis.Pool, end chan int) {
 				conn := pool.Get()
-				defer conn.Close()
+				defer pool.Release(conn)
 				for !self.isStop {
 
 					log.Println("pool active count :", strconv.Itoa(pool.ActiveCount()))
