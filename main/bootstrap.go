@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	. "flume-log-sdk/consumer"
+	"log"
 	"strings"
 )
 
@@ -15,6 +16,9 @@ func main() {
 
 	flumeAgent := flag.String("flume", "flume001.m6:61111,flume002.m6:61112", "flumehost")
 
+	flag.Parse()
+
+	log.Printf("queuename:%s,redis:%s,flume:%s\n", *queuename, *redisHost, *flumeAgent)
 	queueHosts := make([]QueueHostPort, 0)
 	for _, hp := range parseHostPort(*redisHost) {
 		qhost := QueueHostPort{QueueName: *queuename, Maxconn: maxconn, Timeout: maxIdelTime}

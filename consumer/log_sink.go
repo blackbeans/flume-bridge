@@ -13,14 +13,14 @@ import (
 // 用于向flume中作为sink 通过thrift客户端写入日志
 
 type SinkServer struct {
-	queues       map[string][]*redis.Pool
+	redisPool    map[string][]*redis.Pool
 	flumeClients []*flumeClient
 	isStop       bool
 }
 
 func NewSinkServer(option *Option) (server *SinkServer) {
 
-	queues := make(map[string][]*redis.Pool, 0)
+	redisPool := make(map[string][]*redis.Pool, 0)
 
 	//创建redis的消费连接
 	for _, v := range option.queueHostPorts {
@@ -33,20 +33,20 @@ func NewSinkServer(option *Option) (server *SinkServer) {
 				time.Duration(v.Timeout)*time.Second)
 
 			return
-		}, v.Timeout*2, v.Maxconn)
+		}, time.Duration(v.Timeout*2)*time.Second, v.Maxconn/2, v.Maxconn)
 
 		// if nil != err {
 		// 	log.Printf("open redis %s:%d fail!  %s\n", v.Host, v.Port, err.Error())
 		// 	os.Exit(-1)
 		// }
 
-		pools, ok := queues[v.QueueName]
+		pools, ok := redisPool[v.QueueName]
 		if !ok {
 			pools = make([]*redis.Pool, 0)
-			queues[v.QueueName] = pools
+			redisPool[v.QueueName] = pools
 		}
 
-		queues[v.QueueName] = append(pools, pool)
+		redisPool[v.QueueName] = append(pools, pool)
 
 	}
 
@@ -58,7 +58,7 @@ func NewSinkServer(option *Option) (server *SinkServer) {
 		flumeClients = append(flumeClients, client)
 	}
 
-	sinkserver := &SinkServer{queues: queues, flumeClients: flumeClients}
+	sinkserver := &SinkServer{redisPool: redisPool, flumeClients: flumeClients}
 
 	return sinkserver
 }
@@ -66,19 +66,35 @@ func NewSinkServer(option *Option) (server *SinkServer) {
 //启动pop
 func (self *SinkServer) Start() {
 	self.isStop = false
-	for k, v := range self.queues {
-		for i, pool := range v {
-			fmt.Println(strconv.Itoa(i))
 
-			conn := pool.Get()
-			go func(queuename string, conn redis.Conn) {
+	ch := make(chan int, 1)
+	var count = 0
+	for k, v := range self.redisPool {
+
+		log.Println("start redis queueserver succ " + k)
+		for _, pool := range v {
+			count++
+			defer pool.Close()
+			go func(queuename string, pool *redis.Pool, end chan int) {
+				conn := pool.Get()
+				defer conn.Close()
 				for !self.isStop {
+
+					log.Println("pool active count :", strconv.Itoa(pool.ActiveCount()))
 					reply, err := conn.Do("LPOP", queuename)
 					if nil != err || nil == reply {
-						log.Printf("LPOP|FAIL|%s|%s", reply, err)
-						time.Sleep(100 * time.Millisecond)
+						if nil != err {
+							log.Printf("LPOP|FAIL|%s", err)
+							conn.Close()
+							conn = pool.Get()
+						} else {
+							time.Sleep(100 * time.Millisecond)
+						}
+
 						continue
 					}
+
+					pool.Release(conn)
 
 					resp := reply.([]byte)
 					var cmd command
@@ -130,13 +146,33 @@ func (self *SinkServer) Start() {
 					}(momoid, businessName, action, string(body))
 
 				}
-			}(k, conn)
+				end <- -1
+			}(k, pool, ch)
 		}
 	}
+
+	for {
+		count += <-ch
+		if count <= 0 {
+			log.Printf("redis conn  close %d", count)
+			break
+		}
+	}
+
 }
 
 func (self *SinkServer) Stop() {
 	self.isStop = true
+
+	for _, v := range self.flumeClients {
+		v.destory()
+	}
+
+	for _, v := range self.redisPool {
+		for _, p := range v {
+			p.Close()
+		}
+	}
 }
 
 func (self *SinkServer) getFlumeClient(businessName, action string) *flumeClient {

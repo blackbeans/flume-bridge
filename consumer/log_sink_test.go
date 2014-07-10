@@ -9,7 +9,7 @@ func Test_SinkServer(t *testing.T) {
 
 	flumeAgents := []HostPort{HostPort{Host: "localhost", Port: 44444}}
 
-	qhost := QueueHostPort{QueueName: "new-log", Maxconn: 10, Timeout: 5}
+	qhost := QueueHostPort{QueueName: "new-log", Maxconn: 20, Timeout: 5}
 	qhost.HostPort = HostPort{Host: "localhost", Port: 6379}
 
 	hostPorts := []QueueHostPort{qhost}
