@@ -26,6 +26,9 @@ type flumeClient struct {
 	status    Status //连接状态
 }
 
+type FlumeResp struct {
+}
+
 func newFlumeClient(host string, port int) *flumeClient {
 
 	return &flumeClient{host: host, port: port, status: STATUS_INIT}
@@ -65,6 +68,10 @@ func (self *flumeClient) connect() {
 	self.status = STATUS_READY
 }
 
+func (self *flumeClient) isOpen() {
+
+}
+
 func (self *flumeClient) append(header map[string]string, body []byte) error {
 
 	var err error
@@ -84,6 +91,7 @@ func (self *flumeClient) append(header map[string]string, body []byte) error {
 
 		if nil != err {
 			log.Println("send flume event fail " + err.Error())
+			status = flume.Status_ERROR
 		}
 		ch <- status
 
@@ -94,7 +102,7 @@ func (self *flumeClient) append(header map[string]string, body []byte) error {
 
 	//如果没有成功则向上抛出
 	if status != flume.Status_OK {
-		return errors.New("deliver fail !")
+		return errors.New("deliver fail ! " + status.String())
 	}
 	return nil
 

@@ -128,20 +128,24 @@ func (self *SinkServer) Start() {
 
 					//启动处理任务
 					go func(momoid, businessName, action string, body string) {
-						client := self.getFlumeClient(businessName, action)
-						//拼装头部信息
-						header := make(map[string]string, 1)
-						header["businessName"] = businessName
-						header["type"] = action
 
-						//拼Body
-						flumeBody := fmt.Sprintf("%s\t%s\t%s\n", momoid, action, body)
-						err := client.append(header, []byte(flumeBody))
+						for i := 0; i < 3; i++ {
+							client := self.getFlumeClient(businessName, action)
+							//拼装头部信息
+							header := make(map[string]string, 1)
+							header["businessName"] = businessName
+							header["type"] = action
 
-						if nil != err {
-							log.Printf("send 2 flume fail %s \t err:%s\n", body, err.Error())
-						} else {
-							log.Printf("send 2 flume succ %s\n", body)
+							//拼Body
+							flumeBody := fmt.Sprintf("%s\t%s\t%s", momoid, action, body)
+							err := client.append(header, []byte(flumeBody))
+
+							if nil != err {
+								log.Printf("send 2 flume fail %s \t err:%s\n", body, err.Error())
+							} else {
+								log.Printf("send 2 flume succ %s\n", body)
+								break
+							}
 						}
 
 					}(momoid, businessName, action, string(body))
