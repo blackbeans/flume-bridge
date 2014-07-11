@@ -142,6 +142,8 @@ func (self *SinkServer) Start() {
 
 							if nil != err {
 								log.Printf("send 2 flume fail %s \t err:%s\n", body, err.Error())
+								client.destory()
+								client.connect()
 							} else {
 								log.Printf("send 2 flume succ %s\n", body)
 								break
