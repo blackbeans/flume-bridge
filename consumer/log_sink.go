@@ -115,6 +115,10 @@ func (self *SinkServer) Start() {
 
 					bodyContent := cmd.Params["body"]
 
+					//将businessName 加入到body中
+					bodyMap := bodyContent.(map[string]interface{})
+					bodyMap["business_type"] = businessName
+
 					body, err := json.Marshal(bodyContent)
 
 					if nil != err {
