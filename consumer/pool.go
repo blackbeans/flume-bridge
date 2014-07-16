@@ -169,12 +169,15 @@ func (self *flumeClientPool) innerGet() *client.FlumeClient {
 				self.idlePool.Remove(back)
 				idle.flumeclient.Destroy()
 			}
-
-		} else {
+		} else if self.CorePoolSize() >= self.minPoolSize {
+			//如果当前corepoolsize >= 设定的minpoolsize 则可以关闭多余连接
 			self.idlePool.Remove(back)
 			//关闭这个链接
 			idle.flumeclient.Destroy()
 
+		} else {
+			//如果当前的corepoolsize < 设定的Minipoolsize 则不用关闭多余连接，修改过期时间
+			idle.expiredTime.Add(self.idletime)
 		}
 	}
 
