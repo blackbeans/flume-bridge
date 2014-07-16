@@ -69,7 +69,8 @@ func NewSinkServer(option *Option) (server *SinkServer) {
 func monitorPool(hostport string, pool *flumeClientPool) {
 	for {
 		time.Sleep(1 * time.Second)
-		log.Printf("flume:|active:%d,core:%d,max:%d", hostport, pool.ActivePoolSize(), pool.CorePoolSize(), pool.maxPoolSize)
+		log.Printf("flume:%s|active:%d,core:%d,max:%d",
+			hostport, pool.ActivePoolSize(), pool.CorePoolSize(), pool.maxPoolSize)
 	}
 
 }
