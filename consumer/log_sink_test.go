@@ -2,7 +2,10 @@ package consumer
 
 import (
 	"testing"
-	"time"
+)
+
+const (
+	LOG = "{\"action\":\"location\",\"params\":{\"lat\":39.996176990443,\"lng\":116.47478272276,\"acc\":65,\"ip\":\"106.39.7.226\",\"loctype\":0,\"timestamp\":1404447385,\"body\":{\"lat\":39.996176990443,\"lng\":116.47478272276,\"acc\":65,\"ip\":\"106.39.7.226\",\"loctype\":0,\"timestamp\":1404447385},\"momoid\":\"100777\",\"businessName\":\"location\",\"type\":\"update\"}}"
 )
 
 func Test_SinkServer(t *testing.T) {
@@ -17,11 +20,16 @@ func Test_SinkServer(t *testing.T) {
 	option := NewOption(flumeAgents, hostPorts)
 	sinkserver := NewSinkServer(option)
 
-	sinkserver.Start()
+	go func() { sinkserver.Start() }()
 
-	// sinkserver.stop()
-
-	time.Sleep(60 * 10000000)
+	sinkserver.testPushLog("new-log", LOG)
+	sinkserver.testPushLog("new-log", LOG)
+	sinkserver.testPushLog("new-log", LOG)
+	sinkserver.testPushLog("new-log", LOG)
+	sinkserver.testPushLog("new-log", LOG)
+	sinkserver.testPushLog("new-log", LOG)
+	sinkserver.testPushLog("new-log", LOG)
+	sinkserver.testPushLog("new-log", LOG)
 
 	sinkserver.Stop()
 }

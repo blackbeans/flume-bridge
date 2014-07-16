@@ -12,6 +12,7 @@ type HostPort struct {
 
 type QueueHostPort struct {
 	HostPort
+
 	QueueName string
 
 	Maxconn int
