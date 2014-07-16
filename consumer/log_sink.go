@@ -57,11 +57,21 @@ func NewSinkServer(option *Option) (server *SinkServer) {
 			return flumeclient
 		})
 		pools = append(pools, pool)
+
+		go monitorPool(v.Host+strconv.Itoa(v.Port), pool)
 	}
 
 	sinkserver := &SinkServer{redisPool: redisPool, flumeClientPool: pools}
 
 	return sinkserver
+}
+
+func monitorPool(hostport string, pool *flumeClientPool) {
+	for {
+		time.Sleep(1 * time.Second)
+		log.Printf("flume:|active:%d,core:%d,max:%d", hostport, pool.ActivePoolSize(), pool.CorePoolSize(), pool.maxPoolSize)
+	}
+
 }
 
 //启动pop
