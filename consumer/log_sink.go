@@ -58,7 +58,7 @@ func NewSinkServer(option *Option) (server *SinkServer) {
 		})
 		pools = append(pools, pool)
 
-		go monitorPool(v.Host+strconv.Itoa(v.Port), pool)
+		go monitorPool(v.Host+":"+strconv.Itoa(v.Port), pool)
 	}
 
 	sinkserver := &SinkServer{redisPool: redisPool, flumeClientPool: pools}
