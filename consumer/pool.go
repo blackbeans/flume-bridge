@@ -137,8 +137,7 @@ func (self *flumeClientPool) Release(fclient *client.FlumeClient) error {
 	}
 
 	//如果当前的corepoolsize 是大于等于设置的corepoolssize的则直接销毁这个client
-	if self.CorePoolSize() >= self.corepoolSize &&
-		self.CorePoolSize() >= self.minPoolSize {
+	if self.CorePoolSize() >= self.corepoolSize {
 		idleClient.flumeclient.Destroy()
 		fclient = nil
 		//并且从idle
