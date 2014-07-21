@@ -10,8 +10,19 @@ import (
 	"math/rand"
 	_ "os"
 	"strconv"
+	"sync/atomic"
 	"time"
 )
+
+type counter struct {
+	lastSuccValue int64
+
+	currSuccValue int64
+
+	lastFailValue int64
+
+	currFailValue int64
+}
 
 // 用于向flume中作为sink 通过thrift客户端写入日志
 
@@ -19,6 +30,7 @@ type SinkServer struct {
 	redisPool       map[string][]*redis.Pool
 	flumeClientPool []*flumeClientPool
 	isStop          bool
+	monitorCount    counter
 }
 
 func NewSinkServer(option *config.Option) (server *SinkServer) {
@@ -63,13 +75,27 @@ func NewSinkServer(option *config.Option) (server *SinkServer) {
 	}
 
 	sinkserver := &SinkServer{redisPool: redisPool, flumeClientPool: pools}
-
+	go sinkserver.monitorFlume()
 	return sinkserver
+}
+
+func (self *SinkServer) monitorFlume() {
+	for {
+		time.Sleep(1 * time.Second)
+		currSucc := self.monitorCount.currSuccValue
+		currFail := self.monitorCount.currFailValue
+		log.Printf("succ-send:%d,fail-send:%d",
+			(currSucc - self.monitorCount.lastSuccValue),
+			(currFail - self.monitorCount.lastFailValue))
+		self.monitorCount.currSuccValue = currSucc
+		self.monitorCount.currFailValue = currFail
+	}
 }
 
 func monitorPool(hostport string, pool *flumeClientPool) {
 	for {
 		time.Sleep(1 * time.Second)
+
 		log.Printf("flume:%s|active:%d,core:%d,max:%d",
 			hostport, pool.ActivePoolSize(), pool.CorePoolSize(), pool.maxPoolSize)
 	}
@@ -185,8 +211,10 @@ func (self *SinkServer) innerSend(momoid, businessName, action string, body stri
 		}()
 
 		if nil != err {
+			atomic.AddInt64(&self.monitorCount.currFailValue, 1)
 			log.Printf("send 2 flume fail %s \t err:%s\n", body, err.Error())
 		} else {
+			atomic.AddInt64(&self.monitorCount.currSuccValue, 1)
 			// log.Printf("send 2 flume succ %s\n", body)
 			pool.Release(flumeclient)
 			break

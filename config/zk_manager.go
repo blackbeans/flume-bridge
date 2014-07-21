@@ -17,4 +17,5 @@ type FlumeNode struct {
 
 func FetchConfigFromZk() map[string][]FlumeNode {
 
+	return nil
 }
