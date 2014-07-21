@@ -111,7 +111,7 @@ func (self *flumeClientPool) innerRelease(fclient *client.FlumeClient) error {
 		checkClient := e.Value.(*client.FlumeClient)
 		if fclient == checkClient {
 			self.checkOutPool.Remove(e)
-			log.Println("client return pool ")
+			// log.Println("client return pool ")
 			return nil
 		}
 	}

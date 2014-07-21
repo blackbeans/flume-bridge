@@ -2,6 +2,7 @@ package consumer
 
 import (
 	"encoding/json"
+	"flume-log-sdk/config"
 	"flume-log-sdk/consumer/client"
 	"fmt"
 	"github.com/blackbeans/redigo/redis"
@@ -20,12 +21,12 @@ type SinkServer struct {
 	isStop          bool
 }
 
-func NewSinkServer(option *Option) (server *SinkServer) {
+func NewSinkServer(option *config.Option) (server *SinkServer) {
 
 	redisPool := make(map[string][]*redis.Pool, 0)
 
 	//创建redis的消费连接
-	for _, v := range option.queueHostPorts {
+	for _, v := range option.QueueHostPorts {
 
 		pool := redis.NewPool(func() (conn redis.Conn, err error) {
 
@@ -49,7 +50,7 @@ func NewSinkServer(option *Option) (server *SinkServer) {
 
 	pools := make([]*flumeClientPool, 0)
 	//创建flume的client
-	for _, v := range option.flumeAgents {
+	for _, v := range option.FlumeAgents {
 
 		pool := newFlumeClientPool(20, 50, 100, 10*time.Second, func() *client.FlumeClient {
 			flumeclient := client.NewFlumeClient(v.Host, v.Port)
@@ -107,7 +108,7 @@ func (self *SinkServer) Start() {
 					}
 
 					resp := reply.([]byte)
-					var cmd command
+					var cmd config.Command
 					err = json.Unmarshal(resp, &cmd)
 
 					if nil != err {
@@ -139,7 +140,7 @@ func (self *SinkServer) Start() {
 
 					//这里需要优化一下body,需要采用其他的方式定义Body格式，写入
 
-					log.Printf("%s,%s,%s,%s", momoid, businessName, action, string(body))
+					// log.Printf("%s,%s,%s,%s", momoid, businessName, action, string(body))
 
 					//启动处理任务
 					go self.innerSend(momoid, businessName, action, string(body))
@@ -186,7 +187,7 @@ func (self *SinkServer) innerSend(momoid, businessName, action string, body stri
 		if nil != err {
 			log.Printf("send 2 flume fail %s \t err:%s\n", body, err.Error())
 		} else {
-			log.Printf("send 2 flume succ %s\n", body)
+			// log.Printf("send 2 flume succ %s\n", body)
 			pool.Release(flumeclient)
 			break
 		}

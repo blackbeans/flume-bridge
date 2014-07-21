@@ -2,7 +2,8 @@ package main
 
 import (
 	"flag"
-	. "flume-log-sdk/consumer"
+	"flume-log-sdk/config"
+	"flume-log-sdk/consumer"
 	"log"
 	"strings"
 )
@@ -19,26 +20,26 @@ func main() {
 	flag.Parse()
 
 	log.Printf("queuename:%s,redis:%s,flume:%s\n", *queuename, *redisHost, *flumeAgent)
-	queueHosts := make([]QueueHostPort, 0)
+	queueHosts := make([]config.QueueHostPort, 0)
 	for _, hp := range parseHostPort(*redisHost) {
-		qhost := QueueHostPort{QueueName: *queuename, Maxconn: maxconn, Timeout: maxIdelTime}
+		qhost := config.QueueHostPort{QueueName: *queuename, Maxconn: maxconn, Timeout: maxIdelTime}
 		qhost.HostPort = hp
 		queueHosts = append(queueHosts, qhost)
 	}
 
 	flumeAgents := parseHostPort(*flumeAgent)
 
-	option := NewOption(flumeAgents, queueHosts)
-	sinkserver := NewSinkServer(option)
+	option := config.NewOption(flumeAgents, queueHosts)
+	sinkserver := consumer.NewSinkServer(option)
 
 	sinkserver.Start()
 
 }
 
-func parseHostPort(hps string) []HostPort {
-	hostports := make([]HostPort, 0)
+func parseHostPort(hps string) []config.HostPort {
+	hostports := make([]config.HostPort, 0)
 	for _, v := range strings.Split(hps, ",") {
-		hostports = append(hostports, NewHostPort(v))
+		hostports = append(hostports, config.NewHostPort(v))
 	}
 
 	return hostports
