@@ -87,8 +87,8 @@ func (self *SinkServer) monitorFlume() {
 		log.Printf("succ-send:%d,fail-send:%d",
 			(currSucc - self.monitorCount.lastSuccValue),
 			(currFail - self.monitorCount.lastFailValue))
-		self.monitorCount.currSuccValue = currSucc
-		self.monitorCount.currFailValue = currFail
+		self.monitorCount.lastSuccValue = currSucc
+		self.monitorCount.lastFailValue = currFail
 	}
 }
 
