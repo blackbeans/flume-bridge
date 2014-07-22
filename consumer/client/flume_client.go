@@ -3,6 +3,7 @@ package client
 import (
 	"errors"
 	"flume-log-sdk/rpc/flume"
+	"fmt"
 	"git.apache.org/thrift.git/lib/go/thrift"
 	"log"
 	"net"
@@ -131,4 +132,8 @@ func (self *FlumeClient) Destroy() {
 		log.Panicln(err.Error())
 	}
 
+}
+
+func (self *FlumeClient) HostPort() string {
+	return fmt.Sprintf("[%s:%d-->%d]", self.host, self.port, self.status)
 }

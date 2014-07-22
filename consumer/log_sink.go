@@ -140,10 +140,7 @@ func (self *SinkServer) Start() {
 					if nil != err {
 						log.Printf("command unmarshal fail ! %s | error:%s\n", resp, err.Error())
 						continue
-					} else if rand.Int()%10 == 0 {
-						log.Println("trace|command|%s", cmd)
 					}
-
 					//
 					momoid := cmd.Params["momoid"].(string)
 
@@ -218,7 +215,10 @@ func (self *SinkServer) innerSend(momoid, businessName, action string, body stri
 
 		} else {
 			atomic.AddInt64(&self.monitorCount.currSuccValue, 1)
-			// log.Printf("send 2 flume succ %s\n", body)
+			if rand.Int()%100 == 0 {
+				log.Println("trace|send 2 flume succ|%s|%s", flumeclient.HostPort(), flumeBody)
+			}
+
 			break
 		}
 
