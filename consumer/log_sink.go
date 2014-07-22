@@ -207,18 +207,21 @@ func (self *SinkServer) innerSend(momoid, businessName, action string, body stri
 			if err := recover(); nil != err {
 				//回收这个坏的连接
 				pool.ReleaseBroken(flumeclient)
+			} else {
+				pool.Release(flumeclient)
 			}
 		}()
 
 		if nil != err {
 			atomic.AddInt64(&self.monitorCount.currFailValue, 1)
 			log.Printf("send 2 flume fail %s \t err:%s\n", body, err.Error())
+
 		} else {
 			atomic.AddInt64(&self.monitorCount.currSuccValue, 1)
 			// log.Printf("send 2 flume succ %s\n", body)
-			pool.Release(flumeclient)
 			break
 		}
+
 	}
 }
 
