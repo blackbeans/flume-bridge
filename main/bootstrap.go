@@ -9,17 +9,16 @@ import (
 )
 
 func main() {
-
 	queuename := flag.String("queuename", "user-log", "config queuename ")
 	redisHost := flag.String("redis", "redis_node_6008:6008", "redishost")
 	maxconn := 10
 	maxIdelTime := 5
 
-	flumeAgent := flag.String("flume", "flume001.m6:61111,flume002.m6:61112", "flumehost")
-
+	zkhost := flag.String("zkhost", "momo-zk-001.m6:2181,momo-zk-002.m6:2181,momo-zk-003.m6:2181", "zkhost")
+	business := flag.String("businesses", "location", " businesses")
 	flag.Parse()
 
-	log.Printf("queuename:%s,redis:%s,flume:%s\n", *queuename, *redisHost, *flumeAgent)
+	log.Printf("queuename:%s,redis:%s,flume:%s\n", *queuename, *redisHost, *zkhost)
 	queueHosts := make([]config.QueueHostPort, 0)
 	for _, hp := range parseHostPort(*redisHost) {
 		qhost := config.QueueHostPort{QueueName: *queuename, Maxconn: maxconn, Timeout: maxIdelTime}
@@ -27,12 +26,11 @@ func main() {
 		queueHosts = append(queueHosts, qhost)
 	}
 
-	flumeAgents := parseHostPort(*flumeAgent)
+	businessArr := strings.Split(*business, ",")
+	option := config.NewOption(businessArr, *zkhost, queueHosts)
+	sinkmanager := consumer.NewSinkManager(option)
 
-	option := config.NewOption(flumeAgents, queueHosts)
-	sinkserver := consumer.NewSinkServer(option)
-
-	sinkserver.Start()
+	sinkmanager.Start()
 
 }
 

@@ -3,13 +3,10 @@ package consumer
 import (
 	"encoding/json"
 	"flume-log-sdk/config"
-	"flume-log-sdk/consumer/client"
 	"fmt"
 	"github.com/blackbeans/redigo/redis"
 	"log"
 	"math/rand"
-	_ "os"
-	"strconv"
 	"sync/atomic"
 	"time"
 )
@@ -33,48 +30,8 @@ type SinkServer struct {
 	monitorCount    counter
 }
 
-func NewSinkServer(option *config.Option) (server *SinkServer) {
-
-	redisPool := make(map[string][]*redis.Pool, 0)
-
-	//创建redis的消费连接
-	for _, v := range option.QueueHostPorts {
-
-		pool := redis.NewPool(func() (conn redis.Conn, err error) {
-
-			conn, err = redis.DialTimeout("tcp", v.Host+":"+strconv.Itoa(v.Port),
-				time.Duration(v.Timeout)*time.Second,
-				time.Duration(v.Timeout)*time.Second,
-				time.Duration(v.Timeout)*time.Second)
-
-			return
-		}, time.Duration(v.Timeout*2)*time.Second, v.Maxconn/2, v.Maxconn)
-
-		pools, ok := redisPool[v.QueueName]
-		if !ok {
-			pools = make([]*redis.Pool, 0)
-			redisPool[v.QueueName] = pools
-		}
-
-		redisPool[v.QueueName] = append(pools, pool)
-
-	}
-
-	pools := make([]*flumeClientPool, 0)
-	//创建flume的client
-	for _, v := range option.FlumeAgents {
-
-		pool := newFlumeClientPool(20, 50, 100, 10*time.Second, func() *client.FlumeClient {
-			flumeclient := client.NewFlumeClient(v.Host, v.Port)
-			flumeclient.Connect()
-			return flumeclient
-		})
-		pools = append(pools, pool)
-
-		go monitorPool(v.Host+":"+strconv.Itoa(v.Port), pool)
-	}
-
-	sinkserver := &SinkServer{redisPool: redisPool, flumeClientPool: pools}
+func newSinkServer(redisPool map[string][]*redis.Pool, flumePool []*flumeClientPool) (server *SinkServer) {
+	sinkserver := &SinkServer{redisPool: redisPool, flumeClientPool: flumePool}
 	go sinkserver.monitorFlume()
 	return sinkserver
 }
@@ -92,21 +49,11 @@ func (self *SinkServer) monitorFlume() {
 	}
 }
 
-func monitorPool(hostport string, pool *flumeClientPool) {
-	for {
-		time.Sleep(1 * time.Second)
-
-		log.Printf("flume:%s|active:%d,core:%d,max:%d",
-			hostport, pool.ActivePoolSize(), pool.CorePoolSize(), pool.maxPoolSize)
-	}
-
-}
-
 //启动pop
-func (self *SinkServer) Start() {
+func (self *SinkServer) start() {
 
 	self.isStop = false
-	ch := make(chan int, 1)
+
 	var count = 0
 	for k, v := range self.redisPool {
 
@@ -114,7 +61,7 @@ func (self *SinkServer) Start() {
 		for _, pool := range v {
 			count++
 			defer pool.Close()
-			go func(queuename string, pool *redis.Pool, end chan int) {
+			go func(queuename string, pool *redis.Pool) {
 				conn := pool.Get()
 				defer pool.Release(conn)
 				for !self.isStop {
@@ -169,16 +116,7 @@ func (self *SinkServer) Start() {
 					go self.innerSend(momoid, businessName, action, string(body))
 
 				}
-				end <- -1
-			}(k, pool, ch)
-		}
-	}
-
-	for {
-		count += <-ch
-		if count <= 0 {
-			log.Printf("redis conn  close %d", count)
-			break
+			}(k, pool)
 		}
 	}
 
@@ -242,7 +180,7 @@ func (self *SinkServer) testPushLog(queuename, logger string) {
 
 }
 
-func (self *SinkServer) Stop() {
+func (self *SinkServer) stop() {
 	self.isStop = true
 	for _, v := range self.flumeClientPool {
 		v.Destroy()

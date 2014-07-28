@@ -28,15 +28,17 @@ func NewHostPort(hp string) HostPort {
 
 //启动设置的选项
 type Option struct {
-	FlumeAgents []HostPort
+	Businesses []string
+
+	Zkhost string //zookeeper的Host
 
 	QueueHostPorts []QueueHostPort //redis队列Pop
 
 }
 
-func NewOption(flumeAgents []HostPort, hostPorts []QueueHostPort) *Option {
+func NewOption(businesses []string, zkhosts string, hostPorts []QueueHostPort) *Option {
 
-	return &Option{FlumeAgents: flumeAgents, QueueHostPorts: hostPorts}
+	return &Option{Businesses: businesses, Zkhost: zkhosts, QueueHostPorts: hostPorts}
 }
 
 //command
