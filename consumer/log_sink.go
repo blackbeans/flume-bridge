@@ -60,10 +60,11 @@ func (self *SinkServer) start() {
 		log.Println("start redis queueserver succ " + k)
 		for _, pool := range v {
 			count++
-			defer pool.Close()
+
 			go func(queuename string, pool *redis.Pool) {
 				conn := pool.Get()
 				defer pool.Release(conn)
+				defer pool.Close()
 				for !self.isStop {
 
 					// log.Println("pool active count :", strconv.Itoa(pool.ActiveCount()))

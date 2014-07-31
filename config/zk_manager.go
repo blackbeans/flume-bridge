@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	FLUME_PATH = "/flume/"
+	FLUME_PATH = "/flume"
 )
 
 //配置的flumenode
@@ -40,7 +40,7 @@ func NewZKManager(zkhosts string) *ZKManager {
 		log.Printf("使用zkhosts:[%s]！\n", zkhosts)
 	}
 
-	conf := &zk.Config{Addrs: strings.Split(zkhosts, ",")[1:], Timeout: 5 * time.Second}
+	conf := &zk.Config{Addrs: strings.Split(zkhosts, ","), Timeout: 5 * time.Second}
 
 	ss, err := zk.Dial(conf)
 	if nil != err {
@@ -96,7 +96,7 @@ func (self *ZKManager) GetAndWatch(businsess string, existWatcher func(path stri
 	}
 
 	//赋值新的Node
-	flumenode.Flume = decodeNode(childnodes)
+	flumenode.Flume = self.DecodeNode(childnodes)
 
 	//监听数据变更
 	go func() {
@@ -116,7 +116,7 @@ func (self *ZKManager) GetAndWatch(businsess string, existWatcher func(path stri
 					log.Println("recieve child's changes fail ! [" + path + "]  " + err.Error())
 				} else {
 					log.Printf("%s|child's changed %s", path, childnodes)
-					childWatcher(path, decodeNode(childnodes))
+					childWatcher(path, self.DecodeNode(childnodes))
 				}
 
 			}
@@ -126,7 +126,7 @@ func (self *ZKManager) GetAndWatch(businsess string, existWatcher func(path stri
 	return flumenode
 }
 
-func decodeNode(paths []string) []HostPort {
+func (self *ZKManager) DecodeNode(paths []string) []HostPort {
 
 	//也许这里可以通过每个path获取每个地址中的连接数配置
 	// val, _, err := self.session.Get(path, nil)

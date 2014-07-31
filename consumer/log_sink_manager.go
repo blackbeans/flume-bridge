@@ -74,10 +74,14 @@ func initSinkServers(businesses []string, zkmanager *config.ZKManager, callback 
 	for _, business := range businesses {
 		flumeNode := zkmanager.GetAndWatch(business,
 			func(path string, eventType config.ZkEvent) {
-				//当前节点有发生变更
+				//当前节点有发生变更,只关注删除该节点就行
+				if eventType == config.Deleted {
+
+				}
 			},
 			func(path string, childNode []config.HostPort) {
 				//当前业务下的flume节点发生了变更会全量推送一次新的节点
+
 			})
 		flumeMapping[business] = flumeNode
 	}
@@ -119,11 +123,16 @@ func monitorPool(hostport string, pool *flumeClientPool) {
 }
 
 func (self *SinkManager) Start() {
-	for _, v := range self.sinkServers {
+	for name, v := range self.sinkServers {
 		v.start()
+		log.Printf("sinkserver stop [%s]", name)
 	}
 }
 
-func (self *SinkManager) close() {
+func (self *SinkManager) Close() {
 	//TODO
+	for name, sinkserver := range self.sinkServers {
+		sinkserver.stop()
+		log.Printf("sinkserver stop [%s]", name)
+	}
 }

@@ -1,7 +1,12 @@
 package consumer
 
 import (
+	"flume-log-sdk/config"
+	"flume-log-sdk/consumer/client"
+	"github.com/blackbeans/redigo/redis"
+	"strconv"
 	"testing"
+	"time"
 )
 
 const (
@@ -10,17 +15,34 @@ const (
 
 func Test_SinkServer(t *testing.T) {
 
-	flumeAgents := []HostPort{HostPort{Host: "localhost", Port: 44444}}
+	hp := config.HostPort{Host: "localhost", Port: 44444}
 
-	qhost := QueueHostPort{QueueName: "new-log", Maxconn: 20, Timeout: 5}
-	qhost.HostPort = HostPort{Host: "localhost", Port: 6379}
+	flumePool := newFlumeClientPool(20, 50, 100, 10*time.Second, func() *client.FlumeClient {
+		flumeclient := client.NewFlumeClient(hp.Host, hp.Port)
+		flumeclient.Connect()
+		return flumeclient
+	})
 
-	hostPorts := []QueueHostPort{qhost}
+	flumepools := []*flumeClientPool{flumePool}
 
-	option := NewOption(flumeAgents, hostPorts)
-	sinkserver := NewSinkServer(option)
+	v := config.HostPort{Host: "localhost", Port: 6379}
 
-	go func() { sinkserver.Start() }()
+	pool := redis.NewPool(func() (conn redis.Conn, err error) {
+
+		conn, err = redis.DialTimeout("tcp", v.Host+":"+strconv.Itoa(v.Port),
+			time.Duration(5)*time.Second,
+			time.Duration(5)*time.Second,
+			time.Duration(5)*time.Second)
+
+		return
+	}, time.Duration(5*2)*time.Second, 10/2, 10)
+
+	redisPools := make(map[string][]*redis.Pool)
+	redisPools["new-log"] = []*redis.Pool{pool}
+
+	sinkserver := newSinkServer(redisPools, flumepools)
+
+	go func() { sinkserver.start() }()
 
 	sinkserver.testPushLog("new-log", LOG)
 	sinkserver.testPushLog("new-log", LOG)
@@ -31,5 +53,5 @@ func Test_SinkServer(t *testing.T) {
 	sinkserver.testPushLog("new-log", LOG)
 	sinkserver.testPushLog("new-log", LOG)
 
-	sinkserver.Stop()
+	sinkserver.stop()
 }

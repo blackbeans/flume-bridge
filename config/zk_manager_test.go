@@ -11,7 +11,7 @@ func Test_ZKManager(t *testing.T) {
 	zkmanager := NewZKManager(zkhost)
 
 	flumenode := zkmanager.GetAndWatch("business",
-		func(path string, eventType zk.EventType) {
+		func(path string, eventType ZkEvent) {
 			t.Logf("business node event %s %s", path, eventType)
 		},
 		func(path string, childNode []HostPort) {
@@ -48,7 +48,7 @@ func Test_ZKManager(t *testing.T) {
 	}
 
 	flumenode = zkmanager.GetAndWatch("business",
-		func(path string, eventType zk.EventType) {
+		func(path string, eventType ZkEvent) {
 
 		},
 		func(path string, childNode []HostPort) {
@@ -57,6 +57,6 @@ func Test_ZKManager(t *testing.T) {
 
 	t.Logf("flumenode:%s", flumenode)
 
-	defer zkmanager.close()
+	defer zkmanager.Close()
 
 }

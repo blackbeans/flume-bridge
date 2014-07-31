@@ -101,23 +101,23 @@ func (self *flumeClientPool) ActivePoolSize() int {
 func (self *flumeClientPool) ReleaseBroken(fclient *client.FlumeClient) error {
 	self.mutex.Lock()
 	defer self.mutex.Unlock()
-	err := self.innerRelease(fclient)
+	_, err := self.innerRelease(fclient)
 	return err
 
 }
 
-func (self *flumeClientPool) innerRelease(fclient *client.FlumeClient) error {
+func (self *flumeClientPool) innerRelease(fclient *client.FlumeClient) (bool, error) {
 	for e := self.checkOutPool.Back(); nil != e; e = e.Prev() {
 		checkClient := e.Value.(*client.FlumeClient)
 		if fclient == checkClient {
 			self.checkOutPool.Remove(e)
 			// log.Println("client return pool ")
-			return nil
+			return true, nil
 		}
 	}
 
 	//如果到这里，肯定是Bug，释放了一个游离态的客户端
-	return errors.New("invalid flume client , this is not managed by pool")
+	return false, errors.New("invalid flume client , this is not managed by pool")
 
 }
 
@@ -131,18 +131,23 @@ func (self *flumeClientPool) Release(fclient *client.FlumeClient) error {
 	defer self.mutex.Unlock()
 
 	//从checkoutpool中移除
-	err := self.innerRelease(fclient)
+	succ, err := self.innerRelease(fclient)
 	if nil != err {
 		return err
 	}
 
 	//如果当前的corepoolsize 是大于等于设置的corepoolssize的则直接销毁这个client
 	if self.CorePoolSize() >= self.corepoolSize {
+
 		idleClient.flumeclient.Destroy()
 		fclient = nil
+
 		//并且从idle
-	} else {
+	} else if succ {
 		self.idlePool.PushFront(idleClient)
+	} else {
+		fclient.Destroy()
+		fclient = nil
 	}
 
 	return nil
@@ -161,22 +166,21 @@ func (self *flumeClientPool) innerGet() *client.FlumeClient {
 		// push ---> front ----> back 最旧的client
 		idle := (back.Value).(*IdleClient)
 
-		//如果过期时间实在当前时间之后那么后面的都不过期
-		if idle.expiredTime.After(time.Now()) {
-			//判断一下当前连接的状态是否为alive 否则直接销毁
-			if !idle.flumeclient.IsAlive() {
+		//只有在corepoolsize>最小的池子大小，才去检查过期连接
+		if self.CorePoolSize() > self.minPoolSize {
+			//如果过期时间实在当前时间之后那么后面的都不过期
+			if idle.expiredTime.After(time.Now()) {
+				//判断一下当前连接的状态是否为alive 否则直接销毁
 				self.idlePool.Remove(back)
 				idle.flumeclient.Destroy()
-			}
-		} else if self.CorePoolSize() >= self.minPoolSize {
-			//如果当前corepoolsize >= 设定的minpoolsize 则可以关闭多余连接
-			self.idlePool.Remove(back)
-			//关闭这个链接
-			idle.flumeclient.Destroy()
 
+			}
 		} else {
-			//如果当前的corepoolsize < 设定的Minipoolsize 则不用关闭多余连接，修改过期时间
-			idle.expiredTime.Add(self.idletime)
+			//如果小于等于Minpoolsize时，如果过期就将时间重置
+
+			if idle.expiredTime.After(time.Now()) {
+				idle.expiredTime = time.Now().Add(self.idletime)
+			}
 		}
 	}
 

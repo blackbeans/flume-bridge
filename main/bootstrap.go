@@ -5,7 +5,10 @@ import (
 	"flume-log-sdk/config"
 	"flume-log-sdk/consumer"
 	"log"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 )
 
 func main() {
@@ -31,6 +34,15 @@ func main() {
 	sinkmanager := consumer.NewSinkManager(option)
 
 	sinkmanager.Start()
+
+	// reload server list
+	var s = make(chan os.Signal, 1)
+
+	signal.Notify(s, syscall.SIGKILL)
+
+	//是否收到kill的命令
+	<-s
+	sinkmanager.Close()
 
 }
 
