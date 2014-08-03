@@ -3,11 +3,31 @@ package consumer
 import (
 	"container/list"
 	"errors"
+	"flume-log-sdk/config"
 	"flume-log-sdk/consumer/client"
 	"log"
 	"sync"
 	"time"
 )
+
+//flumeclient的pool Link
+type FlumePoolLink struct {
+	flumePool *flumeClientPool
+
+	businessLink *list.List //使用这个clientpool的业务名称
+
+	mutex sync.Mutex //保证在并发情况下能够对list的操作安全
+}
+
+func newFlumePoolLink(hp config.HostPort) *FlumePoolLink {
+	pool := newFlumeClientPool(20, 50, 100, 10*time.Second, func() *client.FlumeClient {
+		flumeclient := client.NewFlumeClient(hp.Host, hp.Port)
+		flumeclient.Connect()
+		return flumeclient
+	})
+	//将此pool封装为Link
+	return &FlumePoolLink{flumePool: pool, businessLink: list.New()}
+}
 
 //flume连接池
 type flumeClientPool struct {

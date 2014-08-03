@@ -2,7 +2,7 @@ package consumer
 
 import (
 	"flume-log-sdk/config"
-	"flume-log-sdk/consumer/client"
+
 	"github.com/blackbeans/redigo/redis"
 	"log"
 	"strconv"
@@ -15,7 +15,7 @@ type SinkManager struct {
 
 	sinkServers map[string]*SinkServer //业务名称和sinkserver对应
 
-	hp2flumeClientPool map[string]*flumeClientPool //对应的Pool
+	hp2flumeClientPool map[string]*FlumePoolLink //对应的Pool
 
 	mutex sync.Mutex
 }
@@ -30,9 +30,9 @@ func NewSinkManager(option *config.Option) *SinkManager {
 	zkmanager := config.NewZKManager(option.Zkhost)
 	sinkmanager.zkmanager = zkmanager
 
-	initSinkServers(option.Businesses, zkmanager, func(business string, pools []*flumeClientPool) {
+	sinkmanager.initSinkServers(option.Businesses, zkmanager, func(business string, pools []*FlumePoolLink) {
 		//创建一个sinkserver
-		sinkserver := newSinkServer(redisPool, pools)
+		sinkserver := newSinkServer(business, redisPool, pools)
 		sinkmanager.sinkServers[business] = sinkserver
 	})
 
@@ -67,44 +67,112 @@ func initRedisQueue(option *config.Option) map[string][]*redis.Pool {
 	return redisPool
 }
 
-func initSinkServers(businesses []string, zkmanager *config.ZKManager, callback func(business string, pools []*flumeClientPool)) {
+func (self *SinkManager) initSinkServers(businesses []string, zkmanager *config.ZKManager,
+	callback func(business string, pools []*FlumePoolLink)) {
 
 	//开始创建一下对应的flume的agent的pool
 	flumeMapping := make(map[string]*config.FlumeNode)
 	for _, business := range businesses {
 		flumeNode := zkmanager.GetAndWatch(business,
-			func(path string, eventType config.ZkEvent) {
+			func(businsess string, eventType config.ZkEvent) {
 				//当前节点有发生变更,只关注删除该节点就行
 				if eventType == config.Deleted {
-
+					self.mutex.Lock()
+					defer self.mutex.Unlock()
+					val, ok := self.sinkServers[businsess]
+					if ok {
+						//关闭这个业务消费
+						val.stop()
+						delete(self.sinkServers, business)
+						log.Printf("business:[%s] deleted\n", business)
+					}
 				}
 			},
-			func(path string, childNode []config.HostPort) {
+			func(businsess string, childNode []config.HostPort) {
 				//当前业务下的flume节点发生了变更会全量推送一次新的节点
+				self.mutex.Lock()
+				defer self.mutex.Unlock()
+				val, ok := self.sinkServers[businsess]
+				if ok {
+					//已经存在那么就检查节点变更
+					for _, hp := range childNode {
+						key := hp.Host + ":" + strconv.Itoa(hp.Port)
+						//先创建该业务节点：
+						pool, ok := self.hp2flumeClientPool[key]
+						//如果存在Pool直接使用
+						if ok {
+							contain := false
+							//检查该业务已有是否已经该flumepool
+							for e := pool.businessLink.Back(); nil != e; e = e.Prev() {
+								if e.Value.(string) == business {
+									contain = true
+									break
+								}
+							}
+
+							//如果不包含则创建该池子并加入该业务对应的flumeclientpoollink中
+							if !contain {
+								val.flumeClientPool = append(val.flumeClientPool, pool)
+								log.Printf("business:[%s] add flume :[\n", business, pool)
+							}
+							//如果已经包含了，则啥事都不干
+
+						} else {
+							//如果不存在该flumepool，直接创建并且添加到该pool种
+							poollink := newFlumePoolLink(hp)
+							self.hp2flumeClientPool[key] = poollink
+							val.flumeClientPool = append(val.flumeClientPool, poollink)
+							poollink.businessLink.PushFront(business)
+						}
+					}
+
+				} else {
+					//新增的消费类型
+					//使用的pool
+					pools := make([]*FlumePoolLink, 0)
+					for _, hp := range childNode {
+						key := hp.Host + ":" + strconv.Itoa(hp.Port)
+						poollink, ok := self.hp2flumeClientPool[key]
+						if !ok {
+							poollink = newFlumePoolLink(hp)
+							self.hp2flumeClientPool[key] = poollink
+						}
+
+						poollink.mutex.Lock()
+						poollink.businessLink.PushFront(business)
+						pools = append(pools, poollink)
+						poollink.mutex.Unlock()
+					}
+					//调用创建
+					callback(business, pools)
+				}
 
 			})
 		flumeMapping[business] = flumeNode
 	}
 
-	hp2FlumePool := make(map[config.HostPort]*flumeClientPool)
+	hp2FlumePool := make(map[config.HostPort]*FlumePoolLink)
 	//创建flume的client
 	for business, flumenodes := range flumeMapping {
 		//开始构建对应关系
-		pools := make([]*flumeClientPool, 0)
+		pools := make([]*FlumePoolLink, 0)
 		for _, hp := range flumenodes.Flume {
-			var pool *flumeClientPool
-			existPool, ok := hp2FlumePool[hp]
+			var poollink *FlumePoolLink
+			existPoolLink, ok := hp2FlumePool[hp]
 			if ok {
-				pool = existPool
+				poollink = existPoolLink
 			} else {
-				pool = newFlumeClientPool(20, 50, 100, 10*time.Second, func() *client.FlumeClient {
-					flumeclient := client.NewFlumeClient(hp.Host, hp.Port)
-					flumeclient.Connect()
-					return flumeclient
-				})
-				go monitorPool(hp.Host+":"+strconv.Itoa(hp.Port), pool)
+				poollink := newFlumePoolLink(hp)
+				hp2FlumePool[hp] = poollink
+				go monitorPool(hp.Host+":"+strconv.Itoa(hp.Port), poollink.flumePool)
 			}
-			pools = append(pools, pool)
+			poollink.mutex.Lock()
+			//为该poollinke attach business
+			poollink.businessLink.PushFront(business)
+
+			poollink.mutex.Unlock()
+
+			pools = append(pools, poollink)
 		}
 
 		//使用创建好的资源初始化sinkserver

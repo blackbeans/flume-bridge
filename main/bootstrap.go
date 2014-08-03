@@ -37,9 +37,7 @@ func main() {
 
 	// reload server list
 	var s = make(chan os.Signal, 1)
-
 	signal.Notify(s, syscall.SIGKILL)
-
 	//是否收到kill的命令
 	<-s
 	sinkmanager.Close()

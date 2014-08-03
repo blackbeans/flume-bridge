@@ -66,8 +66,8 @@ func NewZKManager(zkhosts string) *ZKManager {
 	return &ZKManager{session: ss}
 }
 
-func (self *ZKManager) GetAndWatch(businsess string, existWatcher func(path string, eventType ZkEvent),
-	childWatcher func(path string, childNode []HostPort)) *FlumeNode {
+func (self *ZKManager) GetAndWatch(businsess string, existWatcher func(businsess string, eventType ZkEvent),
+	childWatcher func(businsess string, childNode []HostPort)) *FlumeNode {
 
 	flumenode := &FlumeNode{BusinessName: businsess}
 	watch := make(chan zk.Event)
@@ -104,11 +104,11 @@ func (self *ZKManager) GetAndWatch(businsess string, existWatcher func(path stri
 		case change := <-watch:
 			switch change.Type {
 			case zk.Created:
-				existWatcher(path, Created)
+				existWatcher(businsess, Created)
 			case zk.Deleted:
-				existWatcher(path, Deleted)
+				existWatcher(businsess, Deleted)
 			case zk.Changed:
-				existWatcher(path, Changed)
+				existWatcher(businsess, Changed)
 			case zk.Child:
 				//子节点发生变更，则获取全新的子节点
 				childnodes, _, err := self.session.Children(path, nil)
@@ -116,7 +116,7 @@ func (self *ZKManager) GetAndWatch(businsess string, existWatcher func(path stri
 					log.Println("recieve child's changes fail ! [" + path + "]  " + err.Error())
 				} else {
 					log.Printf("%s|child's changed %s", path, childnodes)
-					childWatcher(path, self.DecodeNode(childnodes))
+					childWatcher(businsess, self.DecodeNode(childnodes))
 				}
 
 			}

@@ -25,13 +25,14 @@ type counter struct {
 
 type SinkServer struct {
 	redisPool       map[string][]*redis.Pool
-	flumeClientPool []*flumeClientPool
+	flumeClientPool []*FlumePoolLink
 	isStop          bool
 	monitorCount    counter
+	business        string
 }
 
-func newSinkServer(redisPool map[string][]*redis.Pool, flumePool []*flumeClientPool) (server *SinkServer) {
-	sinkserver := &SinkServer{redisPool: redisPool, flumeClientPool: flumePool}
+func newSinkServer(business string, redisPool map[string][]*redis.Pool, flumePool []*FlumePoolLink) (server *SinkServer) {
+	sinkserver := &SinkServer{business: business, redisPool: redisPool, flumeClientPool: flumePool}
 	go sinkserver.monitorFlume()
 	return sinkserver
 }
@@ -183,15 +184,21 @@ func (self *SinkServer) testPushLog(queuename, logger string) {
 
 func (self *SinkServer) stop() {
 	self.isStop = true
+	time.Sleep(5 * time.Second)
+
+	//遍历所有的flumeclientlink，将当前Business从该链表中移除
 	for _, v := range self.flumeClientPool {
-		v.Destroy()
+		v.mutex.Lock()
+		for e := v.businessLink.Back(); nil != e; e = e.Prev() {
+			if e.Value.(string) == self.business {
+				//将自己从该flumeclientpoollink种移除
+				v.businessLink.Remove(e)
+				break
+			}
+		}
+		v.mutex.Unlock()
 	}
 
-	for _, v := range self.redisPool {
-		for _, p := range v {
-			p.Close()
-		}
-	}
 }
 
 func (self *SinkServer) getFlumeClientPool(businessName, action string) *flumeClientPool {
@@ -199,6 +206,6 @@ func (self *SinkServer) getFlumeClientPool(businessName, action string) *flumeCl
 	//使用随机算法直接获得
 
 	idx := rand.Intn(len(self.flumeClientPool))
-	return self.flumeClientPool[idx]
+	return self.flumeClientPool[idx].flumePool
 
 }
