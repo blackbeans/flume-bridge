@@ -13,12 +13,6 @@ const (
 	FLUME_PATH = "/flume"
 )
 
-//配置的flumenode
-type FlumeNode struct {
-	BusinessName string     `json:'business'`
-	Flume        []HostPort `json:'flume'`
-}
-
 type ZKManager struct {
 	session *zk.Session
 }
@@ -31,6 +25,24 @@ const (
 	Changed ZkEvent = 3 // From Exists, Get
 	Child   ZkEvent = 4 // From Children
 )
+
+//每个watcher
+type IWatcher interface {
+	BusinessWatcher(business string, eventType ZkEvent)
+	ChildWatcher(business string, childNode []HostPort)
+}
+
+type Watcher struct {
+	watcher   IWatcher
+	zkwatcher chan zk.Event
+	business  string
+}
+
+//创建一个watcher
+func NewWatcher(business string, watcher IWatcher) *Watcher {
+	zkwatcher := make(chan zk.Event, 10)
+	return &Watcher{business: business, watcher: watcher, zkwatcher: zkwatcher}
+}
 
 func NewZKManager(zkhosts string) *ZKManager {
 	if len(zkhosts) <= 0 {
@@ -66,14 +78,10 @@ func NewZKManager(zkhosts string) *ZKManager {
 	return &ZKManager{session: ss}
 }
 
-func (self *ZKManager) GetAndWatch(businsess string, existWatcher func(businsess string, eventType ZkEvent),
-	childWatcher func(businsess string, childNode []HostPort)) *FlumeNode {
+func (self *ZKManager) GetAndWatch(business string, nwatcher *Watcher) []HostPort {
 
-	flumenode := &FlumeNode{BusinessName: businsess}
-	watch := make(chan zk.Event)
-
-	path := FLUME_PATH + "/" + businsess
-	exist, _, err := self.session.Exists(path, watch)
+	path := FLUME_PATH + "/" + business
+	exist, _, err := self.session.Exists(path, nwatcher.zkwatcher)
 
 	//存在该节点
 	if !exist && nil == err {
@@ -89,41 +97,49 @@ func (self *ZKManager) GetAndWatch(businsess string, existWatcher func(businsess
 		return nil
 	}
 
-	childnodes, _, err := self.session.Children(path, watch)
+	childnodes, _, err := self.session.Children(path, nwatcher.zkwatcher)
 	if nil != err {
 		log.Println("get data from [" + path + "] fail! " + err.Error())
 		return nil
 	}
 
 	//赋值新的Node
-	flumenode.Flume = self.DecodeNode(childnodes)
+	flumenodes := self.DecodeNode(childnodes)
 
 	//监听数据变更
 	go func() {
-		select {
-		case change := <-watch:
+		for {
+			//根据zk的文档 watcher机制是无法保证可靠的，其次需要在每次处理完watcher后要重新注册watcher
+			change := <-nwatcher.zkwatcher
 			switch change.Type {
 			case zk.Created:
-				existWatcher(businsess, Created)
+				self.session.Exists(path, nwatcher.zkwatcher)
+				nwatcher.watcher.BusinessWatcher(business, Created)
+
 			case zk.Deleted:
-				existWatcher(businsess, Deleted)
+				self.session.Exists(path, nwatcher.zkwatcher)
+				nwatcher.watcher.BusinessWatcher(business, Deleted)
+
 			case zk.Changed:
-				existWatcher(businsess, Changed)
+				self.session.Exists(path, nwatcher.zkwatcher)
+				nwatcher.watcher.BusinessWatcher(business, Changed)
+
 			case zk.Child:
+				self.session.Children(path, nwatcher.zkwatcher)
 				//子节点发生变更，则获取全新的子节点
 				childnodes, _, err := self.session.Children(path, nil)
 				if nil != err {
 					log.Println("recieve child's changes fail ! [" + path + "]  " + err.Error())
 				} else {
 					log.Printf("%s|child's changed %s", path, childnodes)
-					childWatcher(businsess, self.DecodeNode(childnodes))
+					nwatcher.watcher.ChildWatcher(business, self.DecodeNode(childnodes))
 				}
-
 			}
 		}
+		log.Printf("out of wacher range ! [%s]\n", path)
 	}()
 
-	return flumenode
+	return flumenodes
 }
 
 func (self *ZKManager) DecodeNode(paths []string) []HostPort {
@@ -147,9 +163,7 @@ func (self *ZKManager) DecodeNode(paths []string) []HostPort {
 	}
 	sort.Ints(idx)
 
-	if len(idx) <= 1 {
-		idx = idx[0:]
-	} else {
+	if len(idx) > 1 {
 		idx = idx[:len(idx)/2]
 	}
 

@@ -4,19 +4,27 @@ import (
 	"github.com/blackbeans/zk"
 	"log"
 	"testing"
+	"time"
 )
+
+type TestWatcher struct {
+}
+
+func (self *TestWatcher) BusinessWatcher(path string, eventType ZkEvent) {
+	log.Printf("----------business node event %s %s\n", path, eventType)
+}
+
+func (self *TestWatcher) ChildWatcher(path string, childNode []HostPort) {
+	log.Printf("++++++++++child changed %s|%s\n", path, childNode)
+}
 
 func Test_ZKManager(t *testing.T) {
 	zkhost := "localhost:2181"
 	zkmanager := NewZKManager(zkhost)
+	watcher := NewWatcher("business", &TestWatcher{})
+	// flumenode := zkmanager.GetAndWatch("business", watcher)
 
-	flumenode := zkmanager.GetAndWatch("business",
-		func(path string, eventType ZkEvent) {
-			t.Logf("business node event %s %s", path, eventType)
-		},
-		func(path string, childNode []HostPort) {
-			t.Logf("child changed %s|%s", path, childNode)
-		})
+	zkmanager.GetAndWatch("location", watcher)
 
 	if nil != flumenode {
 		t.Fail()
@@ -47,16 +55,11 @@ func Test_ZKManager(t *testing.T) {
 
 	}
 
-	flumenode = zkmanager.GetAndWatch("business",
-		func(path string, eventType ZkEvent) {
-
-		},
-		func(path string, childNode []HostPort) {
-			t.Logf("%s|%s", path, childNode)
-		})
+	flumenode = zkmanager.GetAndWatch("business", watcher)
 
 	t.Logf("flumenode:%s", flumenode)
 
+	time.Sleep(5 * 60 * time.Second)
 	defer zkmanager.Close()
 
 }
