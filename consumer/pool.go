@@ -20,7 +20,7 @@ type FlumePoolLink struct {
 }
 
 func newFlumePoolLink(hp config.HostPort) *FlumePoolLink {
-	pool := newFlumeClientPool(20, 50, 100, 10*time.Second, func() *client.FlumeClient {
+	pool := newFlumeClientPool(hp, 20, 50, 100, 10*time.Second, func() *client.FlumeClient {
 		flumeclient := client.NewFlumeClient(hp.Host, hp.Port)
 		flumeclient.Connect()
 		return flumeclient
@@ -44,6 +44,10 @@ type flumeClientPool struct {
 	checkOutPool *list.List //已经获取的poolsize
 
 	mutex sync.Mutex
+
+	hostport config.HostPort
+
+	running bool
 }
 
 type IdleClient struct {
@@ -51,18 +55,20 @@ type IdleClient struct {
 	expiredTime time.Time
 }
 
-func newFlumeClientPool(minPoolSize, corepoolSize, maxPoolSize int, idletime time.Duration, dialFunc func() *client.FlumeClient) *flumeClientPool {
+func newFlumeClientPool(hostport config.HostPort, minPoolSize, corepoolSize, maxPoolSize int, idletime time.Duration, dialFunc func() *client.FlumeClient) *flumeClientPool {
 
 	idlePool := list.New()
 	checkOutPool := list.New()
 	clientpool := &flumeClientPool{
+		hostport:     hostport,
 		maxPoolSize:  maxPoolSize,
 		corepoolSize: corepoolSize,
 		minPoolSize:  minPoolSize,
 		idletime:     idletime,
 		idlePool:     idlePool,
 		dialFunc:     dialFunc,
-		checkOutPool: checkOutPool}
+		checkOutPool: checkOutPool,
+		running:      true}
 
 	clientpool.mutex.Lock()
 	defer clientpool.mutex.Unlock()
@@ -76,7 +82,18 @@ func newFlumeClientPool(minPoolSize, corepoolSize, maxPoolSize int, idletime tim
 	return clientpool
 }
 
+func (self *flumeClientPool) monitorPool(hp config.HostPort) {
+	for self.running {
+		time.Sleep(1 * time.Second)
+		log.Printf("flume:%s|active:%d,core:%d,max:%d\n",
+			hp, self.ActivePoolSize(), self.CorePoolSize(), self.maxPoolSize)
+	}
+}
 func (self *flumeClientPool) Get(timeout time.Duration) (*client.FlumeClient, error) {
+
+	if !self.running {
+		return nil, errors.New("flume pool has been stopped!")
+	}
 
 	//***如果在等待的时间内没有获取到client则超时
 	var fclient *client.FlumeClient
@@ -234,7 +251,9 @@ func (self *flumeClientPool) innerGet() *client.FlumeClient {
 }
 
 func (self *flumeClientPool) Destroy() {
-
+	self.mutex.Lock()
+	self.running = false
+	self.mutex.Unlock()
 	for {
 		time.Sleep(5 * time.Second)
 		if self.ActivePoolSize() <= 0 {
@@ -243,6 +262,7 @@ func (self *flumeClientPool) Destroy() {
 		}
 		log.Printf("flume client pool closing : activepool:%d\n", self.ActivePoolSize())
 	}
+
 	//关闭掉空闲的client
 	for e := self.idlePool.Front(); e != nil; e = e.Next() {
 		fclient := e.Value.(*IdleClient)

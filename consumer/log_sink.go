@@ -38,7 +38,7 @@ func newSinkServer(business string, redisPool map[string][]*redis.Pool, flumePoo
 }
 
 func (self *SinkServer) monitorFlume() {
-	for {
+	for !self.isStop {
 		time.Sleep(1 * time.Second)
 		currSucc := self.monitorCount.currSuccValue
 		currFail := self.monitorCount.currFailValue
@@ -65,7 +65,6 @@ func (self *SinkServer) start() {
 			go func(queuename string, pool *redis.Pool) {
 				conn := pool.Get()
 				defer pool.Release(conn)
-				defer pool.Close()
 				for !self.isStop {
 
 					// log.Println("pool active count :", strconv.Itoa(pool.ActiveCount()))

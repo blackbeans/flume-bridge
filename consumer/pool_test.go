@@ -2,6 +2,7 @@ package consumer
 
 import (
 	"container/list"
+	"flume-log-sdk/config"
 	"flume-log-sdk/consumer/client"
 	"log"
 	"testing"
@@ -9,11 +10,12 @@ import (
 )
 
 func Test_Pool(t *testing.T) {
-	clientPool := newFlumeClientPool(10, 20, 30, 10*time.Second, func() *client.FlumeClient {
-		flumeclient := client.NewFlumeClient("localhost", 44444)
-		flumeclient.Connect()
-		return flumeclient
-	})
+	clientPool := newFlumeClientPool(config.NewHostPort("localhost:44444"),
+		10, 20, 30, 10*time.Second, func() *client.FlumeClient {
+			flumeclient := client.NewFlumeClient("localhost", 44444)
+			flumeclient.Connect()
+			return flumeclient
+		})
 
 	idlecount := clientPool.CorePoolSize()
 

@@ -14,7 +14,7 @@ type SinkManager struct {
 
 	sinkServers map[string]*SinkServer //业务名称和sinkserver对应
 
-	hp2flumeClientPool map[string]*FlumePoolLink //对应的Pool
+	hp2flumeClientPool map[config.HostPort]*FlumePoolLink //对应的Pool
 
 	redisPool map[string][]*redis.Pool // 对应的redispool
 
@@ -27,7 +27,7 @@ func NewSinkManager(option *config.Option) *SinkManager {
 
 	sinkmanager := &SinkManager{}
 	sinkmanager.sinkServers = make(map[string]*SinkServer)
-	sinkmanager.hp2flumeClientPool = make(map[string]*FlumePoolLink)
+	sinkmanager.hp2flumeClientPool = make(map[config.HostPort]*FlumePoolLink)
 	sinkmanager.watcherPool = make(map[string]*config.Watcher)
 
 	sinkmanager.redisPool = initRedisQueue(option)
@@ -63,6 +63,7 @@ func initRedisQueue(option *config.Option) map[string][]*redis.Pool {
 			redisPool[v.QueueName] = pools
 		}
 		redisPool[v.QueueName] = append(pools, pool)
+
 	}
 
 	return redisPool
@@ -87,16 +88,19 @@ func (self *SinkManager) initSinkServer(business string, flumenodes []config.Hos
 		return
 	}
 
+	if len(flumenodes) == 0 {
+		log.Println("no valid flume agent node for [" + business + "]")
+		return
+	}
+
 	//新增的消费类型
 	//使用的pool
 	pools := make([]*FlumePoolLink, 0)
 	for _, hp := range flumenodes {
-		key := hp.Host + ":" + strconv.Itoa(hp.Port)
-		poollink, ok := self.hp2flumeClientPool[key]
+		poollink, ok := self.hp2flumeClientPool[hp]
 		if !ok {
 			poollink = newFlumePoolLink(hp)
-			self.hp2flumeClientPool[key] = poollink
-			go monitorPool(key, poollink.flumePool)
+			self.hp2flumeClientPool[hp] = poollink
 		}
 
 		poollink.mutex.Lock()
@@ -107,17 +111,8 @@ func (self *SinkManager) initSinkServer(business string, flumenodes []config.Hos
 
 	//创建一个sinkserver
 	sinkserver := newSinkServer(business, self.redisPool, pools)
+	sinkserver.start()
 	self.sinkServers[business] = sinkserver
-
-}
-
-func monitorPool(hostport string, pool *flumeClientPool) {
-	for {
-		time.Sleep(1 * time.Second)
-
-		log.Printf("flume:%s|active:%d,core:%d,max:%d",
-			hostport, pool.ActivePoolSize(), pool.CorePoolSize(), pool.maxPoolSize)
-	}
 
 }
 
@@ -133,5 +128,16 @@ func (self *SinkManager) Close() {
 	for name, sinkserver := range self.sinkServers {
 		sinkserver.stop()
 		log.Printf("sinkserver stop [%s]", name)
+	}
+
+	for _, redispool := range self.redisPool {
+		for _, pool := range redispool {
+			pool.Close()
+		}
+	}
+
+	//关闭flumepool
+	for _, flumepool := range self.hp2flumeClientPool {
+		flumepool.flumePool.Destroy()
 	}
 }
