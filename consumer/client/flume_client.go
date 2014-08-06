@@ -85,7 +85,7 @@ func (self *FlumeClient) checkAlive() {
 
 func (self *FlumeClient) Append(header map[string]string, body []byte) error {
 
-	if self.status == STATUS_DEAD {
+	if self.status == STATUS_DEAD || !self.transport.IsOpen() {
 		return errors.New("flume client is dead")
 	}
 

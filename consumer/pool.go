@@ -203,6 +203,13 @@ func (self *flumeClientPool) innerGet() *client.FlumeClient {
 		// push ---> front ----> back 最旧的client
 		idle := (back.Value).(*IdleClient)
 
+		//如果已经挂掉直接移除
+		if !idle.flumeclient.IsAlive() {
+			self.idlePool.Remove(back)
+			idle.flumeclient.Destroy()
+			continue
+		}
+
 		//只有在corepoolsize>最小的池子大小，才去检查过期连接
 		if self.CorePoolSize() > self.minPoolSize {
 			//如果过期时间实在当前时间之后那么后面的都不过期
