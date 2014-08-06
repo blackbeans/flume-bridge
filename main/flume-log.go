@@ -18,12 +18,14 @@ func main() {
 
 	queuename := flag.String("queuename", "user-log", "config queuename ")
 	redisHost := flag.String("redis", "redis_node_6008:6008", "redishost")
-	maxconn := 10
-	maxIdelTime := 5
+	redisconns := flag.Int("redis-maxcon", 20, "config redis max connetions")
 
 	zkhost := flag.String("zkhost", "momo-zk-001.m6:2210,momo-zk-002.m6:2210,momo-zk-003.m6:2210", "zkhost")
 	business := flag.String("businesses", "location", " businesses")
 	flag.Parse()
+
+	maxconn := *redisconns
+	maxIdelTime := 5
 
 	log.Printf("queuename:%s,redis:%s,flume:%s\n", *queuename, *redisHost, *zkhost)
 	queueHosts := make([]config.QueueHostPort, 0)
