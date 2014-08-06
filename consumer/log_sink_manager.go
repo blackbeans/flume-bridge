@@ -101,6 +101,23 @@ func (self *SinkManager) initSinkServer(business string, flumenodes []config.Hos
 		if !ok {
 			poollink = newFlumePoolLink(hp)
 			self.hp2flumeClientPool[hp] = poollink
+
+		}
+
+		defer func() {
+
+			if nil == poollink {
+				return
+			}
+
+			if err := recover(); nil != err {
+				log.Fatalf("create flumeclient fail :flume:[%s]\n", hp)
+				poollink = nil
+			}
+		}()
+
+		if nil == poollink {
+			continue
 		}
 
 		poollink.mutex.Lock()
