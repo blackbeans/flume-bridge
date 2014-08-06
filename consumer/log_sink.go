@@ -128,7 +128,8 @@ func (self *SinkServer) innerSend(momoid, businessName, action string, body stri
 	for i := 0; i < 3; i++ {
 		pool := self.getFlumeClientPool(businessName, action)
 		flumeclient, err := pool.Get(5 * time.Second)
-		if nil != err {
+		if nil != err || nil == flumeclient {
+			log.Fatalf("log_sink|fail get flumeclient from pool|%s\n", body)
 			continue
 		}
 		//拼装头部信息
