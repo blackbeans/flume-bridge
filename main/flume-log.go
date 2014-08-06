@@ -18,7 +18,7 @@ func main() {
 
 	queuename := flag.String("queuename", "user-log", "config queuename ")
 	redisHost := flag.String("redis", "redis_node_6008:6008", "redishost")
-	redisconns := flag.Int("redis-maxcon", 20, "config redis max connetions")
+	redisconns := flag.Int("redis-maxconn", 20, "config redis max connetions")
 
 	zkhost := flag.String("zkhost", "momo-zk-001.m6:2210,momo-zk-002.m6:2210,momo-zk-003.m6:2210", "zkhost")
 	business := flag.String("businesses", "location", " businesses")
