@@ -5,6 +5,7 @@ import (
 	"flume-log-sdk/config"
 	"flume-log-sdk/consumer"
 	"log"
+	"os"
 	"os/signal"
 	"runtime"
 	"strings"
