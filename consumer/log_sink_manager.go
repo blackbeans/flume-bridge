@@ -2,6 +2,7 @@ package consumer
 
 import (
 	"flume-log-sdk/config"
+	"fmt"
 	"github.com/blackbeans/redigo/redis"
 	"log"
 	"strconv"
@@ -21,6 +22,8 @@ type SinkManager struct {
 	watcherPool map[string]*config.Watcher //watcherPool
 
 	mutex sync.Mutex
+
+	isRunning bool
 }
 
 func NewSinkManager(option *config.Option) *SinkManager {
@@ -29,16 +32,28 @@ func NewSinkManager(option *config.Option) *SinkManager {
 	sinkmanager.sinkServers = make(map[string]*SinkServer)
 	sinkmanager.hp2flumeClientPool = make(map[config.HostPort]*FlumePoolLink)
 	sinkmanager.watcherPool = make(map[string]*config.Watcher)
-
 	sinkmanager.redisPool = initRedisQueue(option)
 	//从zk中拉取flumenode的配置
 	zkmanager := config.NewZKManager(option.Zkhost)
 	sinkmanager.zkmanager = zkmanager
 
 	sinkmanager.initSinkServers(option.Businesses, zkmanager)
-
 	return sinkmanager
 
+}
+
+func (self *SinkManager) monitorFlume() {
+	for self.isRunning {
+		time.Sleep(1 * time.Second)
+		monitor := ""
+		for k, v := range self.sinkServers {
+
+			succ, fail := v.monitor()
+			monitor += fmt.Sprintf("%s|%d/%d \t", k, succ, fail)
+		}
+
+		log.Println(monitor)
+	}
 }
 
 func initRedisQueue(option *config.Option) map[string][]*redis.Pool {
@@ -134,14 +149,16 @@ func (self *SinkManager) initSinkServer(business string, flumenodes []config.Hos
 }
 
 func (self *SinkManager) Start() {
+
 	for name, v := range self.sinkServers {
 		v.start()
 		log.Printf("sinkserver start [%s]", name)
 	}
+	self.isRunning = true
+	go self.monitorFlume()
 }
 
 func (self *SinkManager) Close() {
-	//TODO
 	for name, sinkserver := range self.sinkServers {
 		sinkserver.stop()
 		log.Printf("sinkserver stop [%s]", name)
@@ -157,4 +174,5 @@ func (self *SinkManager) Close() {
 	for _, flumepool := range self.hp2flumeClientPool {
 		flumepool.flumePool.Destroy()
 	}
+	self.isRunning = false
 }

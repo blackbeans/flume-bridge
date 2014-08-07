@@ -32,27 +32,25 @@ type SinkServer struct {
 	monitorCount    counter
 	business        string
 	batchSize       int
+	sendbuff        int
 }
 
 func newSinkServer(business string, redisPool map[string][]*redis.Pool, flumePool []*FlumePoolLink) (server *SinkServer) {
 	batchSize := 500
+	sendbuff := 10
 	sinkserver := &SinkServer{business: business, redisPool: redisPool,
-		flumeClientPool: flumePool, batchSize: batchSize}
-	go sinkserver.monitorFlume()
+		flumeClientPool: flumePool, batchSize: batchSize, sendbuff: sendbuff}
 	return sinkserver
 }
 
-func (self *SinkServer) monitorFlume() {
-	for !self.isStop {
-		time.Sleep(1 * time.Second)
-		currSucc := self.monitorCount.currSuccValue
-		currFail := self.monitorCount.currFailValue
-		log.Printf("succ-send:%d,fail-send:%d",
-			(currSucc - self.monitorCount.lastSuccValue),
-			(currFail - self.monitorCount.lastFailValue))
-		self.monitorCount.lastSuccValue = currSucc
-		self.monitorCount.lastFailValue = currFail
-	}
+func (self *SinkServer) monitor() (succ, fail int64) {
+	currSucc := self.monitorCount.currSuccValue
+	currFail := self.monitorCount.currFailValue
+	succ = (currSucc - self.monitorCount.lastSuccValue)
+	fail = (currFail - self.monitorCount.lastFailValue)
+	self.monitorCount.lastSuccValue = currSucc
+	self.monitorCount.lastFailValue = currFail
+	return
 }
 
 //启动pop
@@ -70,7 +68,7 @@ func (self *SinkServer) start() {
 			go func(queuename string, pool *redis.Pool) {
 
 				//创建chan ,buffer 为10
-				sendbuff := make(chan []*flume.ThriftFlumeEvent, 10)
+				sendbuff := make(chan []*flume.ThriftFlumeEvent, self.sendbuff)
 				defer close(sendbuff)
 				//启动20个go程从channel获取
 				for i := 0; i < 10; i++ {
