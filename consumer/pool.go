@@ -55,7 +55,8 @@ type IdleClient struct {
 	expiredTime time.Time
 }
 
-func newFlumeClientPool(hostport config.HostPort, minPoolSize, corepoolSize, maxPoolSize int, idletime time.Duration, dialFunc func() *client.FlumeClient) *flumeClientPool {
+func newFlumeClientPool(hostport config.HostPort, minPoolSize, corepoolSize,
+	maxPoolSize int, idletime time.Duration, dialFunc func() *client.FlumeClient) *flumeClientPool {
 
 	idlePool := list.New()
 	checkOutPool := list.New()

@@ -3,6 +3,8 @@ package consumer
 import (
 	"encoding/json"
 	"flume-log-sdk/config"
+	"flume-log-sdk/consumer/client"
+	"flume-log-sdk/rpc/flume"
 	"fmt"
 	"github.com/blackbeans/redigo/redis"
 	"log"
@@ -29,10 +31,13 @@ type SinkServer struct {
 	isStop          bool
 	monitorCount    counter
 	business        string
+	batchSize       int
 }
 
 func newSinkServer(business string, redisPool map[string][]*redis.Pool, flumePool []*FlumePoolLink) (server *SinkServer) {
-	sinkserver := &SinkServer{business: business, redisPool: redisPool, flumeClientPool: flumePool}
+	batchSize := 500
+	sinkserver := &SinkServer{business: business, redisPool: redisPool,
+		flumeClientPool: flumePool, batchSize: batchSize}
 	go sinkserver.monitorFlume()
 	return sinkserver
 }
@@ -63,11 +68,26 @@ func (self *SinkServer) start() {
 			count++
 
 			go func(queuename string, pool *redis.Pool) {
+
+				//创建chan ,buffer 为10
+				sendbuff := make(chan []*flume.ThriftFlumeEvent, 10)
+				defer close(sendbuff)
+				//启动20个go程从channel获取
+				for i := 0; i < 10; i++ {
+					go func(ch chan []*flume.ThriftFlumeEvent) {
+						for !self.isStop {
+							events := <-ch
+							self.innerSend(events)
+						}
+					}(sendbuff)
+				}
+
+				//批量收集数据
 				conn := pool.Get()
 				defer pool.Release(conn)
+				pack := make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
 				for !self.isStop {
 
-					// log.Println("pool active count :", strconv.Itoa(pool.ActiveCount()))
 					reply, err := conn.Do("LPOP", queuename)
 					if nil != err || nil == reply {
 						if nil != err {
@@ -103,19 +123,25 @@ func (self *SinkServer) start() {
 					bodyMap["business_type"] = businessName
 
 					body, err := json.Marshal(bodyContent)
-
 					if nil != err {
 						log.Printf("marshal log body fail %s", err.Error())
 						continue
 					}
 
-					//这里需要优化一下body,需要采用其他的方式定义Body格式，写入
+					//拼Body
+					flumeBody := fmt.Sprintf("%s\t%s\t%s", momoid, action, string(body))
 
-					// log.Printf("%s,%s,%s,%s", momoid, businessName, action, string(body))
+					event := client.NewFlumeEvent(businessName, action, []byte(flumeBody))
+					//如果总数大于batchsize则提交
+					if len(pack) < self.batchSize {
+						//批量提交
+						pack = append(pack, event)
+						continue
+					}
 
-					//启动处理任务
-					go self.innerSend(momoid, businessName, action, string(body))
-
+					//放进channel 中
+					sendbuff <- pack
+					pack = make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
 				}
 			}(k, pool)
 		}
@@ -123,23 +149,17 @@ func (self *SinkServer) start() {
 
 }
 
-func (self *SinkServer) innerSend(momoid, businessName, action string, body string) {
+func (self *SinkServer) innerSend(events []*flume.ThriftFlumeEvent) {
 
 	for i := 0; i < 3; i++ {
-		pool := self.getFlumeClientPool(businessName, action)
+		pool := self.getFlumeClientPool()
 		flumeclient, err := pool.Get(5 * time.Second)
 		if nil != err || nil == flumeclient {
-			log.Fatalf("log_sink|fail get flumeclient from pool|%s\n", body)
+			log.Fatalf("log_sink|fail get flumeclient from pool")
 			continue
 		}
-		//拼装头部信息
-		header := make(map[string]string, 1)
-		header["businessName"] = businessName
-		header["type"] = action
 
-		//拼Body
-		flumeBody := fmt.Sprintf("%s\t%s\t%s", momoid, action, body)
-		err = flumeclient.Append(header, []byte(flumeBody))
+		err = flumeclient.AppendBatch(events)
 		defer func() {
 			if err := recover(); nil != err {
 				//回收这个坏的连接
@@ -151,12 +171,12 @@ func (self *SinkServer) innerSend(momoid, businessName, action string, body stri
 
 		if nil != err {
 			atomic.AddInt64(&self.monitorCount.currFailValue, 1)
-			log.Printf("send 2 flume fail %s \t err:%s\n", body, err.Error())
+			log.Printf("send 2 flume fail %s \t err:%s\n", err.Error())
 
 		} else {
 			atomic.AddInt64(&self.monitorCount.currSuccValue, 1)
-			if rand.Int()%100 == 0 {
-				log.Println("trace|send 2 flume succ|%s|%s", flumeclient.HostPort(), flumeBody)
+			if rand.Int()%10000 == 0 {
+				log.Println("trace|send 2 flume succ|%s|%d", flumeclient.HostPort(), len(events))
 			}
 
 			break
@@ -201,7 +221,7 @@ func (self *SinkServer) stop() {
 
 }
 
-func (self *SinkServer) getFlumeClientPool(businessName, action string) *flumeClientPool {
+func (self *SinkServer) getFlumeClientPool() *flumeClientPool {
 
 	//使用随机算法直接获得
 

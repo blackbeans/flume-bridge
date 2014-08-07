@@ -2,7 +2,6 @@ package consumer
 
 import (
 	"flume-log-sdk/config"
-	"flume-log-sdk/consumer/client"
 	"github.com/blackbeans/redigo/redis"
 	"strconv"
 	"testing"
@@ -17,13 +16,7 @@ func Test_SinkServer(t *testing.T) {
 
 	hp := config.HostPort{Host: "localhost", Port: 44444}
 
-	flumePool := newFlumeClientPool(20, 50, 100, 10*time.Second, func() *client.FlumeClient {
-		flumeclient := client.NewFlumeClient(hp.Host, hp.Port)
-		flumeclient.Connect()
-		return flumeclient
-	})
-
-	flumepools := []*flumeClientPool{flumePool}
+	flumepools := []*FlumePoolLink{newFlumePoolLink(hp)}
 
 	v := config.HostPort{Host: "localhost", Port: 6379}
 
@@ -40,7 +33,7 @@ func Test_SinkServer(t *testing.T) {
 	redisPools := make(map[string][]*redis.Pool)
 	redisPools["new-log"] = []*redis.Pool{pool}
 
-	sinkserver := newSinkServer(redisPools, flumepools)
+	sinkserver := newSinkServer("location", redisPools, flumepools)
 
 	go func() { sinkserver.start() }()
 

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"encoding/json"
+	"flume-log-sdk/rpc/flume"
 )
 
 func TestFlumeClient(t *testing.T) {
@@ -40,13 +41,12 @@ func innerTest(client *FlumeClient, t testing.TB) {
 		return
 	}
 
-	header := make(map[string]string, 2)
-	header["businessName"] = "feed"
-	header["type"] = "list"
-
+	event := NewFlumeEvent("feed", "list", data)
+	events := []*flume.ThriftFlumeEvent{event}
 	for i := 0; i < 1; i++ {
 
-		err := client.Append(header, data)
+		err := client.AppendBatch(events)
+		err = client.Append(event)
 		if nil != err {
 			t.Log(err.Error())
 			t.Fail()

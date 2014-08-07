@@ -77,7 +77,7 @@ func (self *FlumeClient) checkAlive() {
 	for self.status != STATUS_DEAD {
 		//休息1s
 		time.Sleep(1 * time.Second)
-		isOpen := self.thriftclient.Transport.IsOpen()
+		isOpen := self.tsocket.IsOpen()
 		if !isOpen {
 			self.status = STATUS_DEAD
 			log.Printf("flume : %s:%d is Dead", self.host, self.port)
@@ -87,7 +87,20 @@ func (self *FlumeClient) checkAlive() {
 	}
 }
 
-func (self *FlumeClient) Append(header map[string]string, body []byte) error {
+func (self *FlumeClient) AppendBatch(events []*flume.ThriftFlumeEvent) error {
+	return self.innerSend(func() (flume.Status, error) {
+		return self.thriftclient.AppendBatch(events)
+	})
+}
+
+func (self *FlumeClient) Append(event *flume.ThriftFlumeEvent) error {
+
+	return self.innerSend(func() (flume.Status, error) {
+		return self.thriftclient.Append(event)
+	})
+}
+
+func (self *FlumeClient) innerSend(sendfunc func() (flume.Status, error)) error {
 
 	if self.status == STATUS_DEAD || !self.tsocket.IsOpen() {
 		return errors.New("flume client is dead " + self.HostPort())
@@ -101,38 +114,19 @@ func (self *FlumeClient) Append(header map[string]string, body []byte) error {
 
 	}
 
-	var err error
-	event := flume.NewThriftFlumeEvent()
-	event.Headers = header
-	event.Body = body
-
+	status, err := sendfunc()
 	if nil != err {
-		return err
+		log.Printf("send flume event fail error:%s|status:%s ", err.Error(), status)
+		status = flume.Status_ERROR
+		self.status = STATUS_DEAD
+
 	}
-	ch := make(chan flume.Status, 1)
-
-	go func(ch chan flume.Status) {
-
-		//获取远程调用的对象
-		status, err := self.thriftclient.Append(event)
-
-		if nil != err {
-			log.Println("send flume event fail " + err.Error())
-			status = flume.Status_ERROR
-		}
-		ch <- status
-
-	}(ch)
-
-	defer close(ch)
-	status := <-ch
 
 	//如果没有成功则向上抛出
 	if status != flume.Status_OK {
 		return errors.New("deliver fail ! " + status.String())
 	}
 	return nil
-
 }
 
 func (self *FlumeClient) Destroy() {
@@ -144,6 +138,18 @@ func (self *FlumeClient) Destroy() {
 		log.Panicln(err.Error())
 	}
 
+}
+
+func NewFlumeEvent(business, action string, body []byte) *flume.ThriftFlumeEvent {
+	//拼装头部信息
+	header := make(map[string]string, 2)
+	header["businessName"] = business
+	header["type"] = action
+	event := flume.NewThriftFlumeEvent()
+	event.Headers = header
+	event.Body = body
+
+	return event
 }
 
 func (self *FlumeClient) HostPort() string {
