@@ -23,6 +23,7 @@ const (
 type FlumeClient struct {
 	host         string
 	port         int
+	tsocket      *thrift.TSocket
 	transport    thrift.TTransport
 	thriftclient *flume.ThriftSourceProtocolClient
 	status       Status //连接状态
@@ -41,13 +42,16 @@ func (self *FlumeClient) IsAlive() bool {
 
 func (self *FlumeClient) Connect() {
 
+	var tsocket *thrift.TSocket
+	var err error
 	//创建一个物理连接
-	tsocket, err := thrift.NewTSocket(net.JoinHostPort(self.host, strconv.Itoa(self.port)))
-
+	tsocket, err = thrift.NewTSocketTimeout(net.JoinHostPort(self.host, strconv.Itoa(self.port)), 10*time.Second)
 	if nil != err {
 		log.Panic(err)
 		os.Exit(-1)
 	}
+
+	self.tsocket = tsocket
 
 	transportFactory := thrift.NewTFramedTransportFactory(thrift.NewTTransportFactory())
 
@@ -85,8 +89,16 @@ func (self *FlumeClient) checkAlive() {
 
 func (self *FlumeClient) Append(header map[string]string, body []byte) error {
 
-	if self.status == STATUS_DEAD || !self.transport.IsOpen() {
-		return errors.New("flume client is dead")
+	if self.status == STATUS_DEAD || !self.tsocket.IsOpen() {
+		return errors.New("flume client is dead " + self.HostPort())
+	}
+
+	//如如果transport关闭了那么久重新打开
+	if !self.transport.IsOpen() {
+		if err := self.transport.Open(); nil != err {
+			return err
+		}
+
 	}
 
 	var err error
@@ -127,7 +139,7 @@ func (self *FlumeClient) Destroy() {
 
 	self.status = STATUS_DEAD
 	err := self.transport.Close()
-
+	self.tsocket.Close()
 	if nil != err {
 		log.Panicln(err.Error())
 	}
@@ -135,5 +147,5 @@ func (self *FlumeClient) Destroy() {
 }
 
 func (self *FlumeClient) HostPort() string {
-	return fmt.Sprintf("[%s:%d-->%d]", self.host, self.port, self.status)
+	return fmt.Sprintf("[%s:%d-%s]", self.host, self.port, self.status)
 }

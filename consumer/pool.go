@@ -20,7 +20,7 @@ type FlumePoolLink struct {
 }
 
 func newFlumePoolLink(hp config.HostPort) *FlumePoolLink {
-	pool := newFlumeClientPool(hp, 20, 50, 100, 10*time.Second, func() *client.FlumeClient {
+	pool := newFlumeClientPool(hp, 50, 80, 100, 10*time.Second, func() *client.FlumeClient {
 		flumeclient := client.NewFlumeClient(hp.Host, hp.Port)
 		flumeclient.Connect()
 		return flumeclient
@@ -79,6 +79,7 @@ func newFlumeClientPool(hostport config.HostPort, minPoolSize, corepoolSize, max
 		// clientpool.activePoolSize++
 	}
 
+	go clientpool.monitorPool(hostport)
 	return clientpool
 }
 
