@@ -56,7 +56,7 @@ func (self *SinkManager) monitorFlume() {
 		monitor = "FLUME_POOL|"
 		for k, v := range self.hp2flumeClientPool {
 			active, core, max := v.flumePool.monitorPool()
-			monitor += fmt.Sprintf("%s|%d/%d/%d ", k.Host+strconv.Itoa(k.Port), active, core, max)
+			monitor += fmt.Sprintf("%s|%d/%d/%d\n", k.Host+":"+strconv.Itoa(k.Port), active, core, max)
 		}
 		log.Println(monitor)
 	}
