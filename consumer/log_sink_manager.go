@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/blackbeans/redigo/redis"
 	"log"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -53,11 +54,22 @@ func (self *SinkManager) monitorFlume() {
 		}
 		log.Println(monitor)
 
-		monitor = "FLUME_POOL|"
-		for k, v := range self.hp2flumeClientPool {
-			active, core, max := v.flumePool.monitorPool()
-			monitor += fmt.Sprintf("%s|%d/%d/%d\n", k.Host+":"+strconv.Itoa(k.Port), active, core, max)
+		mk := make([]string, 0)
+		monitor = "FLUME_POOL|\n"
+		for k, _ := range self.hp2flumeClientPool {
+			mk = append(mk, k.Host+":"+strconv.Itoa(k.Port))
 		}
+		sort.Strings(mk)
+
+		for _, hp := range mk {
+			v, ok := self.hp2flumeClientPool[config.NewHostPort(hp)]
+			if !ok {
+				continue
+			}
+			active, core, max := v.flumePool.monitorPool()
+			monitor += fmt.Sprintf("%s|%d/%d/%d\n", hp, active, core, max)
+		}
+
 		log.Println(monitor)
 	}
 }
