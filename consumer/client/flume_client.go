@@ -7,7 +7,6 @@ import (
 	"git.apache.org/thrift.git/lib/go/thrift"
 	"log"
 	"net"
-	"os"
 	"strconv"
 	"time"
 )
@@ -40,15 +39,15 @@ func (self *FlumeClient) IsAlive() bool {
 
 }
 
-func (self *FlumeClient) Connect() {
+func (self *FlumeClient) Connect() error {
 
 	var tsocket *thrift.TSocket
 	var err error
 	//创建一个物理连接
 	tsocket, err = thrift.NewTSocketTimeout(net.JoinHostPort(self.host, strconv.Itoa(self.port)), 10*time.Second)
 	if nil != err {
-		log.Panic(err)
-		os.Exit(-1)
+		log.Printf("flume_client|create tsocket fail |%s|%s", self.HostPort(), err)
+		return err
 	}
 
 	self.tsocket = tsocket
@@ -64,13 +63,15 @@ func (self *FlumeClient) Connect() {
 	self.thriftclient = flume.NewThriftSourceProtocolClientFactory(self.transport, protocolFactory)
 
 	if err := self.transport.Open(); nil != err {
-		log.Panic(err)
-		os.Exit(-1)
+		log.Printf("flume_client|create thriftclient fail |%s|%s", self.HostPort(), err)
+		return err
 	}
 
 	self.status = STATUS_READY
 
 	go self.checkAlive()
+
+	return nil
 }
 
 func (self *FlumeClient) checkAlive() {

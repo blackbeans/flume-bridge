@@ -161,8 +161,8 @@ func (self *ZKManager) DecodeNode(paths []string) []HostPort {
 		flumenode[int(seq)] = NewHostPort(hostport)
 		idx = append(idx, int(seq))
 	}
-	sort.Ints(idx)
 
+	sort.Ints(idx)
 	if len(idx) > 1 {
 		idx = idx[:len(idx)/2]
 	}

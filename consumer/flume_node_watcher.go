@@ -79,10 +79,12 @@ func (self *FlumeWatcher) ChildWatcher(business string, childNode []config.HostP
 
 			} else {
 				//如果不存在该flumepool，直接创建并且添加到该pool种
-				poollink := newFlumePoolLink(hp)
-				self.sinkmanager.hp2flumeClientPool[hp] = poollink
-				val.flumeClientPool = append(val.flumeClientPool, poollink)
-				poollink.businessLink.PushFront(business)
+				err, poollink := newFlumePoolLink(hp)
+				if nil != err {
+					self.sinkmanager.hp2flumeClientPool[hp] = poollink
+					val.flumeClientPool = append(val.flumeClientPool, poollink)
+					poollink.businessLink.PushFront(business)
+				}
 			}
 		}
 

@@ -36,7 +36,7 @@ type SinkServer struct {
 }
 
 func newSinkServer(business string, redisPool map[string][]*redis.Pool, flumePool []*FlumePoolLink) (server *SinkServer) {
-	batchSize := 500
+	batchSize := 300
 	sendbuff := 10
 	sinkserver := &SinkServer{business: business, redisPool: redisPool,
 		flumeClientPool: flumePool, batchSize: batchSize, sendbuff: sendbuff}

@@ -10,11 +10,11 @@ import (
 )
 
 func Test_Pool(t *testing.T) {
-	clientPool := newFlumeClientPool(config.NewHostPort("localhost:44444"),
-		10, 20, 30, 10*time.Second, func() *client.FlumeClient {
+	_, clientPool := newFlumeClientPool(config.NewHostPort("localhost:44444"),
+		10, 20, 30, 10*time.Second, func() (error, *client.FlumeClient) {
 			flumeclient := client.NewFlumeClient("localhost", 44444)
-			flumeclient.Connect()
-			return flumeclient
+			err := flumeclient.Connect()
+			return err, flumeclient
 		})
 
 	idlecount := clientPool.CorePoolSize()

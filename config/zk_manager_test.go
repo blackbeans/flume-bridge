@@ -22,23 +22,13 @@ func Test_ZKManager(t *testing.T) {
 	zkhost := "localhost:2181"
 	zkmanager := NewZKManager(zkhost)
 	watcher := NewWatcher("business", &TestWatcher{})
-	// flumenode := zkmanager.GetAndWatch("business", watcher)
+	flumenode := zkmanager.GetAndWatch("business", watcher)
 
 	zkmanager.GetAndWatch("location", watcher)
 
 	if nil != flumenode {
 		t.Fail()
 	}
-
-	// netport, _ := net.InterfaceByName("en0")
-	// addrs, _ := netport.Addrs()
-	// var addr string
-	// for _, v := range addrs {
-	// 	if strings.Contains(v.String(), ".") {
-	// 		addr = v.String()
-	// 		break
-	// 	}
-	// }
 
 	ip := "192.168.0.101"
 	if len(ip) > 0 {

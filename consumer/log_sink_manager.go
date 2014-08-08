@@ -45,13 +45,19 @@ func NewSinkManager(option *config.Option) *SinkManager {
 func (self *SinkManager) monitorFlume() {
 	for self.isRunning {
 		time.Sleep(1 * time.Second)
-		monitor := ""
+		monitor := "FLUME_TPS|"
 		for k, v := range self.sinkServers {
 
 			succ, fail := v.monitor()
 			monitor += fmt.Sprintf("%s|%d/%d \t", k, succ, fail)
 		}
+		log.Println(monitor)
 
+		monitor = "FLUME_POOL|"
+		for k, v := range self.hp2flumeClientPool {
+			active, core, max := v.flumePool.monitorPool()
+			monitor += fmt.Sprintf("%s|%d/%d/%d \t", k, active, core, max)
+		}
 		log.Println(monitor)
 	}
 }
@@ -78,7 +84,6 @@ func initRedisQueue(option *config.Option) map[string][]*redis.Pool {
 			redisPool[v.QueueName] = pools
 		}
 		redisPool[v.QueueName] = append(pools, pool)
-
 	}
 
 	return redisPool
@@ -114,17 +119,19 @@ func (self *SinkManager) initSinkServer(business string, flumenodes []config.Hos
 	for _, hp := range flumenodes {
 		poollink, ok := self.hp2flumeClientPool[hp]
 		if !ok {
-			poollink = newFlumePoolLink(hp)
+			err, pool := newFlumePoolLink(hp)
+			if nil != err {
+				log.Println("SINK_MANGER|INIT FLUMEPOOLLINE|FAIL|%s", err)
+				continue
+			}
+			poollink = pool
 			self.hp2flumeClientPool[hp] = poollink
-
 		}
 
 		defer func() {
-
 			if nil == poollink {
 				return
 			}
-
 			if err := recover(); nil != err {
 				log.Fatalf("create flumeclient fail :flume:[%s]\n", hp)
 				poollink = nil

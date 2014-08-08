@@ -15,8 +15,11 @@ const (
 func Test_SinkServer(t *testing.T) {
 
 	hp := config.HostPort{Host: "localhost", Port: 44444}
-
-	flumepools := []*FlumePoolLink{newFlumePoolLink(hp)}
+	err, poollink := newFlumePoolLink(hp)
+	if nil != err {
+		t.Fail()
+	}
+	flumepools := []*FlumePoolLink{poollink}
 
 	v := config.HostPort{Host: "localhost", Port: 6379}
 
