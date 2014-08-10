@@ -10,5 +10,5 @@ go install ../../flume-log-sdk/consumer/client
 go install ../../flume-log-sdk/consumer/pool
 go install ../../flume-log-sdk/consumer
 
-VERSION=`date -d  +%Y%m%d`
+VERSION=`date +%Y%m%d`
 go build  -o /home/server/flume-bin/flume-log-$VERSION flume-log.go
