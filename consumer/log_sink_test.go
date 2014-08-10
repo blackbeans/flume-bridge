@@ -2,6 +2,7 @@ package consumer
 
 import (
 	"flume-log-sdk/config"
+	"flume-log-sdk/consumer/pool"
 	"github.com/blackbeans/redigo/redis"
 	"strconv"
 	"testing"
@@ -15,11 +16,11 @@ const (
 func Test_SinkServer(t *testing.T) {
 
 	hp := config.HostPort{Host: "localhost", Port: 44444}
-	err, poollink := newFlumePoolLink(hp)
+	err, poollink := pool.NewFlumePoolLink(hp)
 	if nil != err {
 		t.Fail()
 	}
-	flumepools := []*FlumePoolLink{poollink}
+	flumepools := []*pool.FlumePoolLink{poollink}
 
 	v := config.HostPort{Host: "localhost", Port: 6379}
 
@@ -40,14 +41,17 @@ func Test_SinkServer(t *testing.T) {
 
 	go func() { sinkserver.start() }()
 
-	sinkserver.testPushLog("new-log", LOG)
-	sinkserver.testPushLog("new-log", LOG)
-	sinkserver.testPushLog("new-log", LOG)
-	sinkserver.testPushLog("new-log", LOG)
-	sinkserver.testPushLog("new-log", LOG)
-	sinkserver.testPushLog("new-log", LOG)
-	sinkserver.testPushLog("new-log", LOG)
-	sinkserver.testPushLog("new-log", LOG)
+	for i := 0; i < 100; i++ {
+		sinkserver.testPushLog("new-log", LOG)
+		sinkserver.testPushLog("new-log", LOG)
+		sinkserver.testPushLog("new-log", LOG)
+		sinkserver.testPushLog("new-log", LOG)
+		// sinkserver.testPushLog("new-log", LOG)
+		// sinkserver.testPushLog("new-log", LOG)
+		// sinkserver.testPushLog("new-log", LOG)
+		// sinkserver.testPushLog("new-log", LOG)
 
+	}
+	time.Sleep(10 * time.Second)
 	sinkserver.stop()
 }

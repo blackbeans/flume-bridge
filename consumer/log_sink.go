@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flume-log-sdk/config"
 	"flume-log-sdk/consumer/client"
+	"flume-log-sdk/consumer/pool"
 	"flume-log-sdk/rpc/flume"
 	"fmt"
 	"github.com/blackbeans/redigo/redis"
@@ -27,7 +28,7 @@ type counter struct {
 
 type SinkServer struct {
 	redisPool       map[string][]*redis.Pool
-	flumeClientPool []*FlumePoolLink
+	flumeClientPool []*pool.FlumePoolLink
 	isStop          bool
 	monitorCount    counter
 	business        string
@@ -35,7 +36,7 @@ type SinkServer struct {
 	sendbuff        int
 }
 
-func newSinkServer(business string, redisPool map[string][]*redis.Pool, flumePool []*FlumePoolLink) (server *SinkServer) {
+func newSinkServer(business string, redisPool map[string][]*redis.Pool, flumePool []*pool.FlumePoolLink) (server *SinkServer) {
 	batchSize := 300
 	sendbuff := 10
 	sinkserver := &SinkServer{business: business, redisPool: redisPool,
@@ -68,7 +69,8 @@ func (self *SinkServer) start() {
 			go func(queuename string, pool *redis.Pool) {
 
 				//创建chan ,buffer 为10
-				sendbuff := make(chan []*flume.ThriftFlumeEvent, self.sendbuff)
+				// sendbuff := make(chan []*flume.ThriftFlumeEvent, self.sendbuff)
+				sendbuff := make(chan []*flume.ThriftFlumeEvent, 10)
 				defer close(sendbuff)
 				//启动20个go程从channel获取
 				for i := 0; i < 10; i++ {
@@ -89,7 +91,7 @@ func (self *SinkServer) start() {
 					reply, err := conn.Do("LPOP", queuename)
 					if nil != err || nil == reply {
 						if nil != err {
-							log.Printf("LPOP|FAIL|%s", err)
+							log.Printf("LPOP|FAIL|%T", err)
 							conn.Close()
 							conn = pool.Get()
 						} else {
@@ -104,7 +106,7 @@ func (self *SinkServer) start() {
 					err = json.Unmarshal(resp, &cmd)
 
 					if nil != err {
-						log.Printf("command unmarshal fail ! %s | error:%s\n", resp, err.Error())
+						log.Printf("command unmarshal fail ! %T | error:%s\n", resp, err.Error())
 						continue
 					}
 					//
@@ -136,9 +138,7 @@ func (self *SinkServer) start() {
 						pack = append(pack, event)
 						continue
 					}
-
-					//放进channel 中
-					sendbuff <- pack
+					sendbuff <- pack[:len(pack)]
 					pack = make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
 				}
 			}(k, pool)
@@ -168,11 +168,11 @@ func (self *SinkServer) innerSend(events []*flume.ThriftFlumeEvent) {
 		}()
 
 		if nil != err {
-			atomic.AddInt64(&self.monitorCount.currFailValue, 1)
+			atomic.AddInt64(&self.monitorCount.currFailValue, int64(1*self.batchSize))
 			log.Printf("send 2 flume fail %s \t err:%s\n", err.Error())
 
 		} else {
-			atomic.AddInt64(&self.monitorCount.currSuccValue, 1)
+			atomic.AddInt64(&self.monitorCount.currSuccValue, int64(1*self.batchSize))
 			if rand.Int()%10000 == 0 {
 				log.Println("trace|send 2 flume succ|%s|%d", flumeclient.HostPort(), len(events))
 			}
@@ -192,7 +192,7 @@ func (self *SinkServer) testPushLog(queuename, logger string) {
 			defer pool.Release(conn)
 
 			reply, err := conn.Do("RPUSH", queuename, logger)
-			log.Printf("%s|err:%s", reply, err)
+			log.Printf("testPushLog|%d|err:%s", reply, err)
 			break
 
 		}
@@ -206,24 +206,24 @@ func (self *SinkServer) stop() {
 
 	//遍历所有的flumeclientlink，将当前Business从该链表中移除
 	for _, v := range self.flumeClientPool {
-		v.mutex.Lock()
-		for e := v.businessLink.Back(); nil != e; e = e.Prev() {
+		v.Mutex.Lock()
+		for e := v.BusinessLink.Back(); nil != e; e = e.Prev() {
 			if e.Value.(string) == self.business {
 				//将自己从该flumeclientpoollink种移除
-				v.businessLink.Remove(e)
+				v.BusinessLink.Remove(e)
 				break
 			}
 		}
-		v.mutex.Unlock()
+		v.Mutex.Unlock()
 	}
 
 }
 
-func (self *SinkServer) getFlumeClientPool() *flumeClientPool {
+func (self *SinkServer) getFlumeClientPool() *pool.FlumeClientPool {
 
 	//使用随机算法直接获得
 
 	idx := rand.Intn(len(self.flumeClientPool))
-	return self.flumeClientPool[idx].flumePool
+	return self.flumeClientPool[idx].FlumePool
 
 }

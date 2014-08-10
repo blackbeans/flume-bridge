@@ -1,4 +1,4 @@
-package consumer
+package pool
 
 import (
 	"container/list"
@@ -43,10 +43,12 @@ func Test_Pool(t *testing.T) {
 	log.Printf("------------get |active:%d,core:%d,max:%d", clientPool.ActivePoolSize(), clientPool.CorePoolSize(), clientPool.maxPoolSize)
 	//如果活动线程数等于现在持有的则成功，反则失败
 	if clientPool.ActivePoolSize() != checkout.Len() {
+		t.Logf("client pool |active ne checkout|%d,%d", clientPool.ActivePoolSize(), checkout.Len())
 		t.Fail()
 	}
 
 	if clientPool.CorePoolSize() != clientPool.maxPoolSize {
+		t.Logf("client pool |active ne checkout|%d,%d", clientPool.CorePoolSize(), checkout.Len())
 		t.Fail()
 	}
 
