@@ -3,6 +3,8 @@ package config
 import (
 	"github.com/blackbeans/zk"
 	"log"
+	"os"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -49,7 +51,17 @@ func Test_ZKManager(t *testing.T) {
 
 	t.Logf("flumenode:%s", flumenode)
 
-	time.Sleep(5 * 60 * time.Second)
+	hostname, _ := os.Hostname()
+	pid := os.Getpid()
+	zkmanager.RegistePath([]string{"node"}, hostname+"_"+strconv.Itoa(pid))
+
+	exist, _, _ := zkmanager.session.Exists(FLUME_SOURCE_PATH_PID+"/node/"+hostname+"_"+strconv.Itoa(pid), nil)
+	if !exist {
+		t.Failed()
+	} else {
+
+	}
+	time.Sleep(10 * time.Second)
 	defer zkmanager.Close()
 
 }

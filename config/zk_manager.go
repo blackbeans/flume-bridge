@@ -3,14 +3,15 @@ package config
 import (
 	"github.com/blackbeans/zk"
 	"log"
-	"sort"
-	"strconv"
+	_ "sort"
+	_ "strconv"
 	"strings"
 	"time"
 )
 
 const (
-	FLUME_PATH = "/flume"
+	FLUME_PATH            = "/flume"
+	FLUME_SOURCE_PATH_PID = "/flume_source"
 )
 
 type ZKManager struct {
@@ -76,6 +77,44 @@ func NewZKManager(zkhosts string) *ZKManager {
 	}
 
 	return &ZKManager{session: ss}
+}
+
+//注册当前进程节点
+func (self *ZKManager) RegistePath(businesses []string, childpath string) {
+	for _, business := range businesses {
+		tmppath := FLUME_SOURCE_PATH_PID + "/" + business
+		err := self.traverseCreatePath(tmppath)
+		if nil == err {
+			resp, err := self.session.Create(tmppath+"/"+childpath, nil, zk.CreateEphemeral, zk.AclOpen)
+			if nil != err {
+				log.Println("can't create flume source path [" + resp + "]," + err.Error())
+			} else {
+				log.Println("create flume source path :[" + tmppath + "/" + childpath + "]")
+			}
+		}
+	}
+}
+
+func (self *ZKManager) traverseCreatePath(path string) error {
+	split := strings.SplitN(path, "/", 3)
+	log.Println(split)
+	tmppath := ""
+	for _, v := range split {
+		tmppath += v
+		log.Println("---------" + tmppath)
+		log.Println(tmppath)
+		exist, _, err := self.session.Exists(tmppath, nil)
+		if nil == err && !exist {
+			self.session.Create(tmppath, nil, zk.CreatePersistent, zk.AclOpen)
+			return nil
+		} else if nil != err {
+			log.Println("traverseCreatePath|fail|" + err.Error())
+			return err
+		}
+		tmppath += "/"
+	}
+
+	return nil
 }
 
 func (self *ZKManager) GetAndWatch(business string, nwatcher *Watcher) []HostPort {
@@ -152,31 +191,41 @@ func (self *ZKManager) DecodeNode(paths []string) []HostPort {
 	// }
 
 	// path的demo为  flume的 host:port_seqid
-	flumenode := make(map[int]HostPort)
-	idx := make([]int, 0)
-	for _, path := range paths {
-		split := strings.Split(path, "_")
-		hostport := split[0] + ":" + split[1]
-		seq, _ := strconv.ParseInt(split[2], 10, 8)
-		flumenode[int(seq)] = NewHostPort(hostport)
-		idx = append(idx, int(seq))
-	}
+	// flumenode := make(map[int]HostPort)
+	// idx := make([]int, 0)
+	// for _, path := range paths {
+	// 	split := strings.Split(path, "_")
+	// 	hostport := split[0] + ":" + split[1]
+	// 	seq, _ := strconv.ParseInt(split[2], 10, 8)
+	// 	flumenode[int(seq)] = NewHostPort(hostport)
+	// 	idx = append(idx, int(seq))
+	// }
 
-	sort.Ints(idx)
-	if len(idx) > 1 {
-		idx = idx[:len(idx)/2]
-	}
+	// sort.Ints(idx)
+	// if len(idx) > 1 {
+	// 	idx = idx[:len(idx)/2]
+	// }
+
+	// //由小到大排序
+	// flumehost := make([]HostPort, 0)
+	// //选取出一半数量最小的Host作为master
+	// for _, v := range idx {
+
+	// 	hp, _ := flumenode[v]
+	// 	flumehost = append(flumehost, hp)
+	// }
 
 	//由小到大排序
 	flumehost := make([]HostPort, 0)
 	//选取出一半数量最小的Host作为master
-	for _, v := range idx {
-
-		hp, _ := flumenode[v]
+	for _, path := range paths {
+		split := strings.Split(path, "_")
+		hostport := split[0] + ":" + split[1]
+		hp := NewHostPort(hostport)
 		flumehost = append(flumehost, hp)
 	}
 
-	log.Println("running node :%s|seq:%s", flumehost, idx)
+	log.Println("running node :%s", flumehost)
 	return flumehost
 }
 

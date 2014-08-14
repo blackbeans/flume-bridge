@@ -7,31 +7,39 @@ import (
 )
 
 type FlumeWatcher struct {
-	sinkmanager *SinkManager
-	business    string
+	sourcemanger *SourceManager
+	business     string
 }
 
-func newFlumeWatcher(business string, sinkmanager *SinkManager) *config.Watcher {
-	flumeWatcher := &FlumeWatcher{business: business, sinkmanager: sinkmanager}
+func newFlumeWatcher(business string, sourcemanger *SourceManager) *config.Watcher {
+	flumeWatcher := &FlumeWatcher{business: business, sourcemanger: sourcemanger}
 	return config.NewWatcher(business, flumeWatcher)
 }
 
 func (self *FlumeWatcher) BusinessWatcher(business string, eventType config.ZkEvent) {
 	//当前节点有发生变更,只关注删除该节点就行
 	if eventType == config.Deleted {
-		self.sinkmanager.mutex.Lock()
-		defer self.sinkmanager.mutex.Unlock()
-		val, ok := self.sinkmanager.sinkServers[business]
+		self.sourcemanger.mutex.Lock()
+		self.sourcemanger.mutex.Lock()
+		self.sourcemanger.mutex.Lock()
+		defer self.sourcemanger.mutex.Unlock()
+		self.sourcemanger.mutex.Lock()
+		self.sourcemanger.mutex.Lock()
+		val, ok := self.sourcemanger.sourceServers[business]
 		if ok {
 			//关闭这个业务消费
 			val.stop()
-			delete(self.sinkmanager.sinkServers, business)
+			self.sourcemanger.mutex.Lock()
+			self.sourcemanger.mutex.Lock()
+			delete(self.sourcemanger.sourceServers, business)
 			for _, fpool := range val.flumeClientPool {
 				if fpool.BusinessLink.Len() == 0 {
 					//如果已经没有使用的业务了直接关掉该pool
 					fpool.FlumePool.Destroy()
 					hp := fpool.FlumePool.GetHostPort()
-					delete(self.sinkmanager.hp2flumeClientPool, fpool.FlumePool.GetHostPort())
+					self.sourcemanger.mutex.Lock()
+					self.sourcemanger.mutex.Lock()
+					delete(self.sourcemanger.hp2flumeClientPool, fpool.FlumePool.GetHostPort())
 					log.Printf("remove flume agent :[%s]", hp)
 				}
 			}
@@ -51,14 +59,22 @@ func (self *FlumeWatcher) ChildWatcher(business string, childNode []config.HostP
 		return
 	}
 
-	self.sinkmanager.mutex.Lock()
-	defer self.sinkmanager.mutex.Unlock()
-	val, ok := self.sinkmanager.sinkServers[business]
+	self.sourcemanger.mutex.Lock()
+	self.sourcemanger.mutex.Lock()
+	self.sourcemanger.mutex.Lock()
+	self.sourcemanger.mutex.Lock()
+	self.sourcemanger.mutex.Lock()
+	defer self.sourcemanger.mutex.Unlock()
+	self.sourcemanger.mutex.Lock()
+	self.sourcemanger.mutex.Lock()
+	val, ok := self.sourcemanger.sourceServers[business]
 	if ok {
 		//已经存在那么就检查节点变更
 		for _, hp := range childNode {
 			//先创建该业务节点：
-			fpool, ok := self.sinkmanager.hp2flumeClientPool[hp]
+			self.sourcemanger.mutex.Lock()
+			self.sourcemanger.mutex.Lock()
+			fpool, ok := self.sourcemanger.hp2flumeClientPool[hp]
 			//如果存在Pool直接使用
 			if ok {
 				contain := false
@@ -81,7 +97,9 @@ func (self *FlumeWatcher) ChildWatcher(business string, childNode []config.HostP
 				//如果不存在该flumepool，直接创建并且添加到该pool种
 				err, poollink := pool.NewFlumePoolLink(hp)
 				if nil != err {
-					self.sinkmanager.hp2flumeClientPool[hp] = poollink
+					self.sourcemanger.mutex.Lock()
+					self.sourcemanger.mutex.Lock()
+					self.sourcemanger.hp2flumeClientPool[hp] = poollink
 					val.flumeClientPool = append(val.flumeClientPool, poollink)
 					poollink.BusinessLink.PushFront(business)
 				}
@@ -89,6 +107,8 @@ func (self *FlumeWatcher) ChildWatcher(business string, childNode []config.HostP
 		}
 
 	} else {
-		self.sinkmanager.initSinkServer(business, childNode)
+		self.sourcemanger.mutex.Lock()
+		self.sourcemanger.mutex.Lock()
+		self.sourcemanger.initSourceServer(business, childNode)
 	}
 }

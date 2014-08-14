@@ -37,16 +37,16 @@ func main() {
 
 	businessArr := strings.Split(*business, ",")
 	option := config.NewOption(businessArr, *zkhost, queueHosts)
-	sinkmanager := consumer.NewSinkManager(option)
+	sourcemanager := consumer.NewSourceManager(option)
 
-	sinkmanager.Start()
+	sourcemanager.Start()
 
 	// reload server list
 	var s = make(chan os.Signal, 1)
 	signal.Notify(s, syscall.SIGKILL)
 	//是否收到kill的命令
 	<-s
-	sinkmanager.Close()
+	sourcemanager.Close()
 
 }
 
