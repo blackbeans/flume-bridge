@@ -27,9 +27,11 @@ type SourceManager struct {
 	mutex sync.Mutex
 
 	isRunning bool
+
+	instancename string
 }
 
-func NewSourceManager(option *config.Option) *SourceManager {
+func NewSourceManager(instancename string, option *config.Option) *SourceManager {
 
 	sourcemanager := &SourceManager{}
 	sourcemanager.sourceServers = make(map[string]*SourceServer)
@@ -39,6 +41,7 @@ func NewSourceManager(option *config.Option) *SourceManager {
 	//从zk中拉取flumenode的配置
 	zkmanager := config.NewZKManager(option.Zkhost)
 	sourcemanager.zkmanager = zkmanager
+	sourcemanager.instancename = instancename
 
 	sourcemanager.initSourceServers(option.Businesses, zkmanager)
 	return sourcemanager
@@ -115,7 +118,7 @@ func (self *SourceManager) initSourceServers(businesses []string, zkmanager *con
 	//-------------------注册当前进程ID到zk
 	currpid := os.Getpid()
 	hostname, _ := os.Hostname()
-	self.zkmanager.RegistePath(businesses, hostname+"_"+strconv.Itoa(currpid))
+	self.zkmanager.RegistePath(businesses, hostname+"_"+self.instancename+":"+strconv.Itoa(currpid))
 
 }
 

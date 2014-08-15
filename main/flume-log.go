@@ -15,7 +15,7 @@ import (
 func main() {
 
 	runtime.GOMAXPROCS(4)
-
+	instancename := flag.String("instancename", "flume-log", "instance name ")
 	queuename := flag.String("queuename", "user-log", "config queuename ")
 	redisHost := flag.String("redis", "redis_node_6008:6008", "redishost")
 	redisconns := flag.Int("redis-maxconn", 20, "config redis max connetions")
@@ -37,7 +37,7 @@ func main() {
 
 	businessArr := strings.Split(*business, ",")
 	option := config.NewOption(businessArr, *zkhost, queueHosts)
-	sourcemanager := consumer.NewSourceManager(option)
+	sourcemanager := consumer.NewSourceManager(option, instancename)
 
 	sourcemanager.Start()
 
