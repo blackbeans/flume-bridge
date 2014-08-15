@@ -37,7 +37,7 @@ func main() {
 
 	businessArr := strings.Split(*business, ",")
 	option := config.NewOption(businessArr, *zkhost, queueHosts)
-	sourcemanager := consumer.NewSourceManager(option, instancename)
+	sourcemanager := consumer.NewSourceManager(*instancename, option)
 
 	sourcemanager.Start()
 
