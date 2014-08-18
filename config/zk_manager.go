@@ -101,8 +101,6 @@ func (self *ZKManager) traverseCreatePath(path string) error {
 	tmppath := ""
 	for _, v := range split {
 		tmppath += v
-		log.Println("---------" + tmppath)
-		log.Println(tmppath)
 		exist, _, err := self.session.Exists(tmppath, nil)
 		if nil == err && !exist {
 			self.session.Create(tmppath, nil, zk.CreatePersistent, zk.AclOpen)

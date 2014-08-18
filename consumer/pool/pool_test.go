@@ -10,7 +10,7 @@ import (
 )
 
 func Test_Pool(t *testing.T) {
-	_, clientPool := newFlumeClientPool(config.NewHostPort("localhost:44444"),
+	errs, clientPool := newFlumeClientPool(config.NewHostPort("localhost:44444"),
 		10, 20, 30, 10*time.Second, func() (error, *client.FlumeClient) {
 			flumeclient := client.NewFlumeClient("localhost", 44444)
 			err := flumeclient.Connect()
@@ -18,6 +18,8 @@ func Test_Pool(t *testing.T) {
 		})
 
 	idlecount := clientPool.CorePoolSize()
+
+	log.Println(errs)
 
 	//默认初始化10个最小连接
 	if idlecount != 10 {

@@ -217,7 +217,6 @@ func (self *FlumeClientPool) innerGet() *client.FlumeClient {
 	self.mutex.Lock()
 	defer self.mutex.Unlock()
 	for back := self.idlePool.Back(); back != nil; back = back.Prev() {
-
 		// push ---> front ----> back 最旧的client
 		idle := (back.Value).(*IdleClient)
 
@@ -235,7 +234,6 @@ func (self *FlumeClientPool) innerGet() *client.FlumeClient {
 				//判断一下当前连接的状态是否为alive 否则直接销毁
 				self.idlePool.Remove(back)
 				idle.flumeclient.Destroy()
-
 			}
 		} else {
 			//如果小于等于Minpoolsize时，如果过期就将时间重置
@@ -271,6 +269,21 @@ func (self *FlumeClientPool) innerGet() *client.FlumeClient {
 			} else {
 				self.checkOutPool.PushFront(newClient)
 				fclient = newClient
+			}
+		}
+	}
+
+	//检查是否corepool>= minpool,否则就创建连接
+	if self.CorePoolSize() < self.minPoolSize {
+		for i := self.CorePoolSize(); i <= self.minPoolSize; i++ {
+			//如果没有可用链接则创建一个
+			err, fclient := self.dialFunc()
+			if nil != err {
+				log.Printf("POOL|corepool(%d) < minpool(%d)|CREATE CLIENT FAIL|%s",
+					self.CorePoolSize(), self.minPoolSize, err.Error())
+			} else {
+				idleClient := &IdleClient{flumeclient: fclient, expiredTime: (time.Now().Add(self.idletime))}
+				self.idlePool.PushFront(idleClient)
 			}
 		}
 	}
