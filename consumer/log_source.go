@@ -1,6 +1,7 @@
 package consumer
 
 import (
+	"container/list"
 	"encoding/json"
 	"flume-log-sdk/config"
 	"flume-log-sdk/consumer/client"
@@ -28,7 +29,7 @@ type counter struct {
 
 type SourceServer struct {
 	redisPool       map[string][]*redis.Pool
-	flumeClientPool []*pool.FlumePoolLink
+	flumeClientPool *list.List
 	isStop          bool
 	monitorCount    counter
 	business        string
@@ -36,7 +37,7 @@ type SourceServer struct {
 	sendbuff        int
 }
 
-func newSourceServer(business string, redisPool map[string][]*redis.Pool, flumePool []*pool.FlumePoolLink) (server *SourceServer) {
+func newSourceServer(business string, redisPool map[string][]*redis.Pool, flumePool *list.List) (server *SourceServer) {
 	batchSize := 300
 	sendbuff := 10
 	sourceServer := &SourceServer{business: business, redisPool: redisPool,
@@ -205,25 +206,16 @@ func (self *SourceServer) stop() {
 	time.Sleep(5 * time.Second)
 
 	//遍历所有的flumeclientlink，将当前Business从该链表中移除
-	for _, v := range self.flumeClientPool {
-		v.Mutex.Lock()
-		for e := v.BusinessLink.Back(); nil != e; e = e.Prev() {
-			if e.Value.(string) == self.business {
-				//将自己从该flumeclientpoollink种移除
-				v.BusinessLink.Remove(e)
-				break
-			}
-		}
-		v.Mutex.Unlock()
+	for v := self.flumeClientPool.Back(); nil != v; v = v.Prev() {
+		v.Value.(*pool.FlumePoolLink).DetachBusiness(self.business)
 	}
-
 }
 
 func (self *SourceServer) getFlumeClientPool() *pool.FlumeClientPool {
 
-	//使用随机算法直接获得
-
-	idx := rand.Intn(len(self.flumeClientPool))
-	return self.flumeClientPool[idx].FlumePool
+	//采用轮训算法
+	e := self.flumeClientPool.Back()
+	self.flumeClientPool.MoveToFront(e)
+	return e.Value.(*pool.FlumePoolLink).FlumePool
 
 }

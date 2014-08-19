@@ -20,13 +20,43 @@ type FlumePoolLink struct {
 }
 
 func NewFlumePoolLink(hp config.HostPort) (error, *FlumePoolLink) {
-	err, pool := newFlumeClientPool(hp, 30, 60, 100, 10*time.Second, func() (error, *client.FlumeClient) {
+	err, pool := newFlumeClientPool(hp, 10, 30, 50, 10*time.Second, func() (error, *client.FlumeClient) {
 		flumeclient := client.NewFlumeClient(hp.Host, hp.Port)
 		err := flumeclient.Connect()
 		return err, flumeclient
 	})
 	//将此pool封装为Link
 	return err, &FlumePoolLink{FlumePool: pool, BusinessLink: list.New()}
+}
+
+func (self *FlumePoolLink) IsAttached(business string) bool {
+
+	for e := self.BusinessLink.Back(); nil != e; e = e.Prev() {
+		if e.Value.(string) == business {
+			return true
+		}
+	}
+	return false
+}
+
+//将该business从link重移除
+func (self *FlumePoolLink) DetachBusiness(business string) {
+	self.Mutex.Lock()
+	for e := self.BusinessLink.Back(); nil != e; e = e.Prev() {
+		if e.Value.(string) == business {
+			self.BusinessLink.Remove(e)
+		}
+	}
+	self.Mutex.Unlock()
+}
+
+//将该business从link重移除
+func (self *FlumePoolLink) AttachBusiness(business string) {
+	self.Mutex.Lock()
+	if self.IsAttached(business) {
+		self.BusinessLink.PushFront(business)
+	}
+	self.Mutex.Unlock()
 }
 
 //flume连接池

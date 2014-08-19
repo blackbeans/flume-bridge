@@ -1,6 +1,7 @@
 package consumer
 
 import (
+	"container/list"
 	"flume-log-sdk/config"
 	"flume-log-sdk/consumer/pool"
 	"fmt"
@@ -138,7 +139,8 @@ func (self *SourceManager) initSourceServer(business string, flumenodes []config
 
 	//新增的消费类型
 	//使用的pool
-	pools := make([]*pool.FlumePoolLink, 0)
+	pools := list.New()
+	// pools := make([]*pool.FlumePoolLink, 0)
 	for _, hp := range flumenodes {
 		poollink, ok := self.hp2flumeClientPool[hp]
 		if !ok {
@@ -156,7 +158,7 @@ func (self *SourceManager) initSourceServer(business string, flumenodes []config
 				return
 			}
 			if err := recover(); nil != err {
-				log.Fatalf("create flumeclient fail :flume:[%s]\n", hp)
+				log.Printf("create flumeclient fail :flume:[%s]\n", hp)
 				poollink = nil
 			}
 		}()
@@ -166,8 +168,8 @@ func (self *SourceManager) initSourceServer(business string, flumenodes []config
 		}
 
 		poollink.Mutex.Lock()
-		poollink.BusinessLink.PushFront(business)
-		pools = append(pools, poollink)
+		poollink.AttachBusiness(business)
+		pools.PushFront(poollink)
 		poollink.Mutex.Unlock()
 	}
 

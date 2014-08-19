@@ -1,6 +1,7 @@
 package consumer
 
 import (
+	"container/list"
 	"flume-log-sdk/config"
 	"flume-log-sdk/consumer/pool"
 	"github.com/blackbeans/redigo/redis"
@@ -20,7 +21,6 @@ func Test_SourceServer(t *testing.T) {
 	if nil != err {
 		t.Fail()
 	}
-	flumepools := []*pool.FlumePoolLink{poollink}
 
 	v := config.HostPort{Host: "localhost", Port: 6379}
 
@@ -36,8 +36,9 @@ func Test_SourceServer(t *testing.T) {
 
 	redisPools := make(map[string][]*redis.Pool)
 	redisPools["new-log"] = []*redis.Pool{pool}
-
-	sourceserver := newSourceServer("location", redisPools, flumepools)
+	list := list.New()
+	list.PushFront(poollink)
+	sourceserver := newSourceServer("location", redisPools, list)
 
 	go func() { sourceserver.start() }()
 
