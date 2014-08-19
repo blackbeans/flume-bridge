@@ -112,6 +112,7 @@ func (self *FlumeWatcher) ChildWatcher(business string, childNode []config.HostP
 		}
 
 	} else {
-		self.sourcemanger.initSourceServer(business, childNode)
+		sourceserver := self.sourcemanger.initSourceServer(business, childNode)
+		sourceserver.start()
 	}
 }

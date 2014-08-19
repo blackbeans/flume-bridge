@@ -123,18 +123,18 @@ func (self *SourceManager) initSourceServers(businesses []string, zkmanager *con
 
 }
 
-func (self *SourceManager) initSourceServer(business string, flumenodes []config.HostPort) {
+func (self *SourceManager) initSourceServer(business string, flumenodes []config.HostPort) *SourceServer {
 
 	//首先判断当前是否该sink支持该种business
 	_, ok := self.watcherPool[business]
 	if !ok {
 		log.Printf("unsupport business[%s],HostPorts:[%s]\n", business, flumenodes)
-		return
+		return nil
 	}
 
 	if len(flumenodes) == 0 {
 		log.Println("no valid flume agent node for [" + business + "]")
-		return
+		return nil
 	}
 
 	//新增的消费类型
@@ -167,16 +167,15 @@ func (self *SourceManager) initSourceServer(business string, flumenodes []config
 			continue
 		}
 
-		poollink.Mutex.Lock()
 		poollink.AttachBusiness(business)
 		pools.PushFront(poollink)
-		poollink.Mutex.Unlock()
 	}
 
 	//创建一个sourceserver
 	sourceserver := newSourceServer(business, self.redisPool, pools)
-	sourceserver.start()
+	log.Printf("LOG_SOURCE_MANGER|SOURCE SERVER [%s]|START\n", business)
 	self.sourceServers[business] = sourceserver
+	return sourceserver
 
 }
 

@@ -30,7 +30,13 @@ func NewFlumePoolLink(hp config.HostPort) (error, *FlumePoolLink) {
 }
 
 func (self *FlumePoolLink) IsAttached(business string) bool {
+	self.Mutex.Lock()
+	defer self.Mutex.Unlock()
+	return self.exists(business)
 
+}
+
+func (self *FlumePoolLink) exists(business string) bool {
 	for e := self.BusinessLink.Back(); nil != e; e = e.Prev() {
 		if e.Value.(string) == business {
 			return true
@@ -40,21 +46,21 @@ func (self *FlumePoolLink) IsAttached(business string) bool {
 }
 
 //将该business从link重移除
+func (self *FlumePoolLink) AttachBusiness(business string) {
+	self.Mutex.Lock()
+	if self.exists(business) {
+		self.BusinessLink.PushFront(business)
+	}
+	defer self.Mutex.Unlock()
+}
+
+//将该business从link重移除
 func (self *FlumePoolLink) DetachBusiness(business string) {
 	self.Mutex.Lock()
 	for e := self.BusinessLink.Back(); nil != e; e = e.Prev() {
 		if e.Value.(string) == business {
 			self.BusinessLink.Remove(e)
 		}
-	}
-	self.Mutex.Unlock()
-}
-
-//将该business从link重移除
-func (self *FlumePoolLink) AttachBusiness(business string) {
-	self.Mutex.Lock()
-	if self.IsAttached(business) {
-		self.BusinessLink.PushFront(business)
 	}
 	self.Mutex.Unlock()
 }
