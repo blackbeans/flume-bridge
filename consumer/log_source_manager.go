@@ -158,7 +158,7 @@ func (self *SourceManager) initSourceServer(business string, flumenodes []config
 				return
 			}
 			if err := recover(); nil != err {
-				log.Printf("create flumeclient fail :flume:[%s]\n", hp)
+				log.Printf("SOURCE_MANGER|CREATE FLUMECLIENT|FAIL|[%s]\n", hp)
 				poollink = nil
 			}
 		}()

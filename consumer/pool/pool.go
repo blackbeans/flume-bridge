@@ -45,10 +45,10 @@ func (self *FlumePoolLink) exists(business string) bool {
 	return false
 }
 
-//将该business从link重移除
+//将该business从link加入
 func (self *FlumePoolLink) AttachBusiness(business string) {
 	self.Mutex.Lock()
-	if self.exists(business) {
+	if !self.exists(business) {
 		self.BusinessLink.PushFront(business)
 	}
 	defer self.Mutex.Unlock()
@@ -344,10 +344,16 @@ func (self *FlumeClientPool) Destroy() {
 	for e := self.idlePool.Front(); e != nil; e = e.Next() {
 		fclient := e.Value.(*IdleClient)
 		fclient.flumeclient.Destroy()
+		self.idlePool.Remove(e)
+		fclient = nil
 	}
 	//关闭掉已经
 	for e := self.checkOutPool.Front(); e != nil; e = e.Next() {
-		e.Value.(*client.FlumeClient).Destroy()
+		fclient := e.Value.(*client.FlumeClient)
+		fclient.Destroy()
+		self.checkOutPool.Remove(e)
+		fclient = nil
 	}
 
+	log.Printf("FLUME_POOL|DESTORY|%s", self.GetHostPort())
 }

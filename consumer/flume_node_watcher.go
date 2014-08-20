@@ -45,7 +45,8 @@ func (self *FlumeWatcher) clearPool(business string, pool *pool.FlumePoolLink) {
 		pool.FlumePool.Destroy()
 		hp := pool.FlumePool.GetHostPort()
 		delete(self.sourcemanger.hp2flumeClientPool, pool.FlumePool.GetHostPort())
-		log.Printf("remove flume agent :[%s]", hp)
+		pool = nil
+		log.Printf("WATCHER|REMOVE FLUME:%s", hp)
 	}
 	pool.Mutex.Unlock()
 }
@@ -77,11 +78,14 @@ func (self *FlumeWatcher) ChildWatcher(business string, childNode []config.HostP
 
 			//如果当前的node没有在childnode中则删除该pooL
 			if !contain {
+				size := val.flumeClientPool.Len()
 				link.DetachBusiness(business)
+				val.flumeClientPool.Remove(e)
 				self.clearPool(business, link)
 				//从Business的clientpool中移除该client
-				val.flumeClientPool.Remove(e)
-				log.Printf("WATCHER|BUSINESS:%s|REMOVE FLUME:%s", business, hp)
+
+				log.Printf("WATCHER|BUSINESS:%s|REMOVE FLUME:%s|SIZE:[%d,%d]\n",
+					business, hp, size, val.flumeClientPool.Len())
 			}
 		}
 
@@ -96,7 +100,7 @@ func (self *FlumeWatcher) ChildWatcher(business string, childNode []config.HostP
 				if !fpool.IsAttached(business) {
 					val.flumeClientPool.PushFront(fpool)
 					fpool.AttachBusiness(business)
-					log.Printf("WATCHER|BUSINESS::[%s]|ADD POOL|[%s]\n", business, hp)
+					log.Printf("WATCHER|BUSINESS:[%s]|ADD POOL|[%s]\n", business, hp)
 				}
 				//如果已经包含了，则啥事都不干
 

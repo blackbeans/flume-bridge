@@ -63,7 +63,7 @@ func (self *SourceServer) start() {
 	var count = 0
 	for k, v := range self.redisPool {
 
-		log.Println("start redis queueserver succ " + k)
+		log.Println("LOG_SOURCE|REDIS|" + k + "|START")
 		for _, pool := range v {
 			count++
 
