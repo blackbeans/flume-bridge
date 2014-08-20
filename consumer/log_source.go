@@ -170,12 +170,12 @@ func (self *SourceServer) innerSend(events []*flume.ThriftFlumeEvent) {
 
 		if nil != err {
 			atomic.AddInt64(&self.monitorCount.currFailValue, int64(1*self.batchSize))
-			log.Println("LOG_SOURCE|SEND FLUME|FAIL|%s|%s|TRY:%d\n", self.business, err.Error(), i)
+			log.Printf("LOG_SOURCE|SEND FLUME|FAIL|%s|%s|TRY:%d\n", self.business, err.Error(), i)
 
 		} else {
 			atomic.AddInt64(&self.monitorCount.currSuccValue, int64(1*self.batchSize))
 			if rand.Int()%10000 == 0 {
-				log.Println("trace|send 2 flume succ|%s|%d\n", flumeclient.HostPort(), len(events))
+				log.Printf("trace|send 2 flume succ|%s|%d\n", flumeclient.HostPort(), len(events))
 			}
 			break
 		}

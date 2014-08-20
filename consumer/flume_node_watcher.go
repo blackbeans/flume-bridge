@@ -29,7 +29,6 @@ func (self *FlumeWatcher) BusinessWatcher(business string, eventType config.ZkEv
 			for e := val.flumeClientPool.Back(); nil != e; e = e.Prev() {
 				self.clearPool(business, e.Value.(*pool.FlumePoolLink))
 			}
-
 			log.Printf("business:[%s] deleted\n", business)
 		} else {
 			log.Printf("business:[%s] not exist !\n", business)
@@ -45,10 +44,10 @@ func (self *FlumeWatcher) clearPool(business string, pool *pool.FlumePoolLink) {
 		pool.FlumePool.Destroy()
 		hp := pool.FlumePool.GetHostPort()
 		delete(self.sourcemanger.hp2flumeClientPool, pool.FlumePool.GetHostPort())
-		pool = nil
-		log.Printf("WATCHER|REMOVE FLUME:%s", hp)
+		log.Printf("WATCHER|REMOVE FLUME:%s\n", hp)
 	}
 	pool.Mutex.Unlock()
+	pool = nil
 }
 
 func (self *FlumeWatcher) ChildWatcher(business string, childNode []config.HostPort) {
@@ -83,7 +82,6 @@ func (self *FlumeWatcher) ChildWatcher(business string, childNode []config.HostP
 				val.flumeClientPool.Remove(e)
 				self.clearPool(business, link)
 				//从Business的clientpool中移除该client
-
 				log.Printf("WATCHER|BUSINESS:%s|REMOVE FLUME:%s|SIZE:[%d,%d]\n",
 					business, hp, size, val.flumeClientPool.Len())
 			}

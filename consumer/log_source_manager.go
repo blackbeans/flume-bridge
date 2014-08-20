@@ -140,7 +140,6 @@ func (self *SourceManager) initSourceServer(business string, flumenodes []config
 	//新增的消费类型
 	//使用的pool
 	pools := list.New()
-	// pools := make([]*pool.FlumePoolLink, 0)
 	for _, hp := range flumenodes {
 		poollink, ok := self.hp2flumeClientPool[hp]
 		if !ok {

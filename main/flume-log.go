@@ -48,6 +48,7 @@ func main() {
 	<-s
 	sourcemanager.Close()
 
+	log.Printf("FLUME_LOG|STOPPED|%s", *instancename)
 }
 
 func parseHostPort(hps string) []config.HostPort {
