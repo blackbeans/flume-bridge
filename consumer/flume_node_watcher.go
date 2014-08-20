@@ -64,7 +64,7 @@ func (self *FlumeWatcher) ChildWatcher(business string, childNode []config.HostP
 	if ok {
 		//判断该业务下已经被停掉的节点
 		// for _, link := range val.flumeClientPool {
-		for e := val.flumeClientPool.Back(); nil != e; e = e.Next() {
+		for e := val.flumeClientPool.Back(); nil != e; e = e.Prev() {
 			link := e.Value.(*pool.FlumePoolLink)
 			hp := link.FlumePool.GetHostPort()
 			contain := false
@@ -105,10 +105,12 @@ func (self *FlumeWatcher) ChildWatcher(business string, childNode []config.HostP
 			} else {
 				//如果不存在该flumepool，直接创建并且添加到该pool种
 				err, poollink := pool.NewFlumePoolLink(hp)
-				if nil != err {
+				if nil == err || nil != poollink {
 					self.sourcemanger.hp2flumeClientPool[hp] = poollink
 					val.flumeClientPool.PushFront(poollink)
 					poollink.AttachBusiness(business)
+				} else if nil != err {
+					log.Printf("WATCHER|BUSINESS:[%s]|ADD POOL|FAIL|[%s]|%s\n", business, hp, err.Error())
 				}
 			}
 		}
