@@ -46,7 +46,7 @@ func (self *FlumeClient) Connect() error {
 	//创建一个物理连接
 	tsocket, err = thrift.NewTSocketTimeout(net.JoinHostPort(self.host, strconv.Itoa(self.port)), 10*time.Second)
 	if nil != err {
-		log.Printf("flume_client|create tsocket fail |%s|%s", self.HostPort(), err)
+		log.Printf("FLUME_CLIENT|CREATE TSOCKET|FAIL|%s|%s\n", self.HostPort(), err)
 		return err
 	}
 
@@ -63,7 +63,7 @@ func (self *FlumeClient) Connect() error {
 	self.thriftclient = flume.NewThriftSourceProtocolClientFactory(self.transport, protocolFactory)
 
 	if err := self.transport.Open(); nil != err {
-		log.Printf("flume_client|create thriftclient fail |%s|%s", self.HostPort(), err)
+		log.Printf("FLUME_CLIENT|CREATE THRIFT CLIENT|FAIL|%s|%s", self.HostPort(), err)
 		return err
 	}
 
@@ -104,7 +104,7 @@ func (self *FlumeClient) Append(event *flume.ThriftFlumeEvent) error {
 func (self *FlumeClient) innerSend(sendfunc func() (flume.Status, error)) error {
 
 	if self.status == STATUS_DEAD || !self.tsocket.IsOpen() {
-		return errors.New("flume client is dead " + self.HostPort())
+		return errors.New("FLUME_CLIENT|DEAD|" + self.HostPort())
 	}
 
 	//如如果transport关闭了那么久重新打开
@@ -117,7 +117,7 @@ func (self *FlumeClient) innerSend(sendfunc func() (flume.Status, error)) error 
 
 	status, err := sendfunc()
 	if nil != err {
-		log.Printf("send flume event fail error:%s|status:%s ", err.Error(), status)
+		log.Printf("FLUME_CLIENT|SEND EVENT|FAIL|%s|STATUS:%s ", err.Error(), status)
 		status = flume.Status_ERROR
 		self.status = STATUS_DEAD
 

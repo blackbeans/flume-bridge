@@ -145,7 +145,7 @@ func (self *SourceServer) start() {
 			}(k, pool)
 		}
 	}
-
+	log.Printf("LOG_SOURCE|SOURCE SERVER [%s]|STARTED\n", self.business)
 }
 
 func (self *SourceServer) innerSend(events []*flume.ThriftFlumeEvent) {
@@ -154,7 +154,7 @@ func (self *SourceServer) innerSend(events []*flume.ThriftFlumeEvent) {
 		pool := self.getFlumeClientPool()
 		flumeclient, err := pool.Get(5 * time.Second)
 		if nil != err || nil == flumeclient {
-			log.Fatalf("log_source|fail get flumeclient from pool")
+			log.Printf("LOG_SOURCE|GET FLUMECLIENT|FAIL|%s|%s|TRY:%d\n", self.business, err, i)
 			continue
 		}
 
@@ -170,14 +170,13 @@ func (self *SourceServer) innerSend(events []*flume.ThriftFlumeEvent) {
 
 		if nil != err {
 			atomic.AddInt64(&self.monitorCount.currFailValue, int64(1*self.batchSize))
-			log.Printf("send 2 flume fail %s \t err:%s\n", err.Error())
+			log.Println("LOG_SOURCE|SEND FLUME|FAIL|%s|%s|TRY:%d\n", self.business, err.Error(), i)
 
 		} else {
 			atomic.AddInt64(&self.monitorCount.currSuccValue, int64(1*self.batchSize))
 			if rand.Int()%10000 == 0 {
-				log.Println("trace|send 2 flume succ|%s|%d", flumeclient.HostPort(), len(events))
+				log.Println("trace|send 2 flume succ|%s|%d\n", flumeclient.HostPort(), len(events))
 			}
-
 			break
 		}
 
@@ -209,6 +208,7 @@ func (self *SourceServer) stop() {
 	for v := self.flumeClientPool.Back(); nil != v; v = v.Prev() {
 		v.Value.(*pool.FlumePoolLink).DetachBusiness(self.business)
 	}
+	log.Printf("LOG_SOURCE|SOURCE SERVER|[%s]|STOPPED\n", self.business)
 }
 
 func (self *SourceServer) getFlumeClientPool() *pool.FlumeClientPool {

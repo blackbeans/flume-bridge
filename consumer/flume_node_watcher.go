@@ -81,7 +81,7 @@ func (self *FlumeWatcher) ChildWatcher(business string, childNode []config.HostP
 				self.clearPool(business, link)
 				//从Business的clientpool中移除该client
 				val.flumeClientPool.Remove(e)
-				log.Printf("business:%s|WATCHER|REMOVE FLUME:%s", business, hp)
+				log.Printf("WATCHER|BUSINESS:%s|REMOVE FLUME:%s", business, hp)
 			}
 		}
 
@@ -96,7 +96,7 @@ func (self *FlumeWatcher) ChildWatcher(business string, childNode []config.HostP
 				if !fpool.IsAttached(business) {
 					val.flumeClientPool.PushFront(fpool)
 					fpool.AttachBusiness(business)
-					log.Printf("business:[%s] add flume :[\n", business, fpool)
+					log.Printf("WATCHER|BUSINESS::[%s]|ADD POOL|[%s]\n", business, hp)
 				}
 				//如果已经包含了，则啥事都不干
 

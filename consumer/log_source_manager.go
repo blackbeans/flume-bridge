@@ -173,7 +173,6 @@ func (self *SourceManager) initSourceServer(business string, flumenodes []config
 
 	//创建一个sourceserver
 	sourceserver := newSourceServer(business, self.redisPool, pools)
-	log.Printf("LOG_SOURCE_MANGER|SOURCE SERVER [%s]|START\n", business)
 	self.sourceServers[business] = sourceserver
 	return sourceserver
 
@@ -181,18 +180,17 @@ func (self *SourceManager) initSourceServer(business string, flumenodes []config
 
 func (self *SourceManager) Start() {
 
-	for name, v := range self.sourceServers {
+	for _, v := range self.sourceServers {
 		v.start()
-		log.Printf("sourceserver start [%s]", name)
 	}
 	self.isRunning = true
 	go self.monitorFlume()
+	log.Printf("LOG_SOURCE_MANGER|[%s]|STARTED\n", self.instancename)
 }
 
 func (self *SourceManager) Close() {
-	for name, sourceserver := range self.sourceServers {
+	for _, sourceserver := range self.sourceServers {
 		sourceserver.stop()
-		log.Printf("source server stop [%s]", name)
 	}
 
 	for _, redispool := range self.redisPool {
@@ -206,4 +204,5 @@ func (self *SourceManager) Close() {
 		flumepool.FlumePool.Destroy()
 	}
 	self.isRunning = false
+	log.Printf("LOG_SOURCE_MANGER|[%s]|STOP\n", self.instancename)
 }
