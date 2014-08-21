@@ -47,7 +47,6 @@ func main() {
 	//是否收到kill的命令
 	<-s
 	sourcemanager.Close()
-
 	log.Printf("FLUME_LOG|STOPPED|%s", *instancename)
 }
 

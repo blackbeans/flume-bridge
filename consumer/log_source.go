@@ -8,7 +8,6 @@ import (
 	"flume-log-sdk/consumer/pool"
 	"flume-log-sdk/rpc/flume"
 	"fmt"
-	"github.com/blackbeans/redigo/redis"
 	"log"
 	"math/rand"
 	"sync/atomic"
@@ -28,20 +27,23 @@ type counter struct {
 // 用于向flume中作为sink 通过thrift客户端写入日志
 
 type SourceServer struct {
-	redisPool       map[string][]*redis.Pool
 	flumeClientPool *list.List
 	isStop          bool
 	monitorCount    counter
 	business        string
 	batchSize       int
-	sendbuff        int
+	buffChannel     chan *flume.ThriftFlumeEvent
 }
 
-func newSourceServer(business string, redisPool map[string][]*redis.Pool, flumePool *list.List) (server *SourceServer) {
+func newSourceServer(business string, flumePool *list.List) (server *SourceServer) {
 	batchSize := 300
-	sendbuff := 10
-	sourceServer := &SourceServer{business: business, redisPool: redisPool,
-		flumeClientPool: flumePool, batchSize: batchSize, sendbuff: sendbuff}
+	sendbuff := 100
+	buffChannel := make(chan *flume.ThriftFlumeEvent, sendbuff)
+	sourceServer := &SourceServer{
+		business:        business,
+		flumeClientPool: flumePool,
+		batchSize:       batchSize,
+		buffChannel:     buffChannel}
 	return sourceServer
 }
 
@@ -60,91 +62,36 @@ func (self *SourceServer) start() {
 
 	self.isStop = false
 
-	var count = 0
-	for k, v := range self.redisPool {
-
-		log.Println("LOG_SOURCE|REDIS|" + k + "|START")
-		for _, pool := range v {
-			count++
-
-			go func(queuename string, pool *redis.Pool) {
-
-				//创建chan ,buffer 为10
-				// sendbuff := make(chan []*flume.ThriftFlumeEvent, self.sendbuff)
-				sendbuff := make(chan []*flume.ThriftFlumeEvent, 10)
-				defer close(sendbuff)
-				//启动20个go程从channel获取
-				for i := 0; i < 10; i++ {
-					go func(ch chan []*flume.ThriftFlumeEvent) {
-						for !self.isStop {
-							events := <-ch
-							self.innerSend(events)
-						}
-					}(sendbuff)
-				}
-
-				//批量收集数据
-				conn := pool.Get()
-				defer pool.Release(conn)
-				pack := make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
-				for !self.isStop {
-
-					reply, err := conn.Do("LPOP", queuename)
-					if nil != err || nil == reply {
-						if nil != err {
-							log.Printf("LPOP|FAIL|%T", err)
-							conn.Close()
-							conn = pool.Get()
-						} else {
-							time.Sleep(100 * time.Millisecond)
-						}
-
-						continue
-					}
-
-					resp := reply.([]byte)
-					var cmd config.Command
-					err = json.Unmarshal(resp, &cmd)
-
-					if nil != err {
-						log.Printf("command unmarshal fail ! %T | error:%s\n", resp, err.Error())
-						continue
-					}
-					//
-					momoid := cmd.Params["momoid"].(string)
-
-					businessName := cmd.Params["businessName"].(string)
-
-					action := cmd.Params["type"].(string)
-
-					bodyContent := cmd.Params["body"]
-
-					//将businessName 加入到body中
-					bodyMap := bodyContent.(map[string]interface{})
-					bodyMap["business_type"] = businessName
-
-					body, err := json.Marshal(bodyContent)
-					if nil != err {
-						log.Printf("marshal log body fail %s", err.Error())
-						continue
-					}
-
-					//拼Body
-					flumeBody := fmt.Sprintf("%s\t%s\t%s", momoid, action, string(body))
-
-					event := client.NewFlumeEvent(businessName, action, []byte(flumeBody))
-					//如果总数大于batchsize则提交
-					if len(pack) < self.batchSize {
-						//批量提交
-						pack = append(pack, event)
-						continue
-					}
-					sendbuff <- pack[:len(pack)]
-					pack = make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
-				}
-			}(k, pool)
-		}
+	//创建chan ,buffer 为10
+	sendbuff := make(chan []*flume.ThriftFlumeEvent, self.batchSize)
+	//启动20个go程从channel获取
+	for i := 0; i < 10; i++ {
+		go func(ch chan []*flume.ThriftFlumeEvent) {
+			for !self.isStop {
+				events := <-ch
+				self.innerSend(events)
+			}
+		}(sendbuff)
 	}
+
+	go func() {
+		//批量收集数据
+		pack := make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
+		for !self.isStop {
+			event := <-self.buffChannel
+			//如果总数大于batchsize则提交
+			if len(pack) < self.batchSize {
+				//批量提交
+				pack = append(pack, event)
+				continue
+			}
+			sendbuff <- pack[:len(pack)]
+			pack = make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
+		}
+
+		close(sendbuff)
+	}()
+
 	log.Printf("LOG_SOURCE|SOURCE SERVER [%s]|STARTED\n", self.business)
 }
 
@@ -183,21 +130,37 @@ func (self *SourceServer) innerSend(events []*flume.ThriftFlumeEvent) {
 	}
 }
 
-//仅供测试使用推送数据
-func (self *SourceServer) testPushLog(queuename, logger string) {
+//解析出decodecommand
+func decodeCommand(resp []byte) (string, *flume.ThriftFlumeEvent) {
+	var cmd config.Command
+	err := json.Unmarshal(resp, &cmd)
+	if nil != err {
+		log.Printf("command unmarshal fail ! %T | error:%s\n", resp, err.Error())
+		return "", nil
+	}
+	//
+	momoid := cmd.Params["momoid"].(string)
 
-	for _, v := range self.redisPool {
-		for _, pool := range v {
-			conn := pool.Get()
-			defer pool.Release(conn)
+	businessName := cmd.Params["businessName"].(string)
 
-			reply, err := conn.Do("RPUSH", queuename, logger)
-			log.Printf("testPushLog|%d|err:%s", reply, err)
-			break
+	action := cmd.Params["type"].(string)
 
-		}
+	bodyContent := cmd.Params["body"]
+
+	//将businessName 加入到body中
+	bodyMap := bodyContent.(map[string]interface{})
+	bodyMap["business_type"] = businessName
+
+	body, err := json.Marshal(bodyContent)
+	if nil != err {
+		log.Printf("marshal log body fail %s", err.Error())
+		return businessName, nil
 	}
 
+	//拼Body
+	flumeBody := fmt.Sprintf("%s\t%s\t%s", momoid, action, string(body))
+	event := client.NewFlumeEvent(businessName, action, []byte(flumeBody))
+	return businessName, event
 }
 
 func (self *SourceServer) stop() {
@@ -208,6 +171,7 @@ func (self *SourceServer) stop() {
 	for v := self.flumeClientPool.Back(); nil != v; v = v.Prev() {
 		v.Value.(*pool.FlumePoolLink).DetachBusiness(self.business)
 	}
+	close(self.buffChannel)
 	log.Printf("LOG_SOURCE|SOURCE SERVER|[%s]|STOPPED\n", self.business)
 }
 

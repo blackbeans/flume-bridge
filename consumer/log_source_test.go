@@ -4,8 +4,6 @@ import (
 	"container/list"
 	"flume-log-sdk/config"
 	"flume-log-sdk/consumer/pool"
-	"github.com/blackbeans/redigo/redis"
-	"strconv"
 	"testing"
 	"time"
 )
@@ -22,36 +20,15 @@ func Test_SourceServer(t *testing.T) {
 		t.Fail()
 	}
 
-	v := config.HostPort{Host: "localhost", Port: 6379}
-
-	pool := redis.NewPool(func() (conn redis.Conn, err error) {
-
-		conn, err = redis.DialTimeout("tcp", v.Host+":"+strconv.Itoa(v.Port),
-			time.Duration(5)*time.Second,
-			time.Duration(5)*time.Second,
-			time.Duration(5)*time.Second)
-
-		return
-	}, time.Duration(5*2)*time.Second, 10/2, 10)
-
-	redisPools := make(map[string][]*redis.Pool)
-	redisPools["new-log"] = []*redis.Pool{pool}
 	list := list.New()
 	list.PushFront(poollink)
-	sourceserver := newSourceServer("location", redisPools, list)
+	sourceserver := newSourceServer("location", list)
 
 	go func() { sourceserver.start() }()
 
 	for i := 0; i < 100; i++ {
-		sourceserver.testPushLog("new-log", LOG)
-		sourceserver.testPushLog("new-log", LOG)
-		sourceserver.testPushLog("new-log", LOG)
-		sourceserver.testPushLog("new-log", LOG)
-		// sourceserver.testPushLog("new-log", LOG)
-		// sourceserver.testPushLog("new-log", LOG)
-		// sourceserver.testPushLog("new-log", LOG)
-		// sourceserver.testPushLog("new-log", LOG)
-
+		_, message := decodeCommand([]byte(LOG))
+		sourceserver.buffChannel <- message
 	}
 	time.Sleep(10 * time.Second)
 	sourceserver.stop()

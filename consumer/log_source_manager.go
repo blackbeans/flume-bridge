@@ -171,7 +171,7 @@ func (self *SourceManager) initSourceServer(business string, flumenodes []config
 	}
 
 	//创建一个sourceserver
-	sourceserver := newSourceServer(business, self.redisPool, pools)
+	sourceserver := newSourceServer(business, pools)
 	self.sourceServers[business] = sourceserver
 	return sourceserver
 
@@ -185,9 +185,60 @@ func (self *SourceManager) Start() {
 	self.isRunning = true
 	go self.monitorFlume()
 	log.Printf("LOG_SOURCE_MANGER|[%s]|STARTED\n", self.instancename)
+	self.startWorker()
+}
+
+func (self *SourceManager) startWorker() {
+	for k, v := range self.redisPool {
+
+		log.Println("LOG_SOURCE|REDIS|[" + k + "]|START")
+		for _, pool := range v {
+
+			go func(queuename string, pool *redis.Pool) {
+
+				//批量收集数据
+				conn := pool.Get()
+				defer pool.Release(conn)
+				for self.isRunning {
+
+					reply, err := conn.Do("LPOP", queuename)
+					if nil != err || nil == reply {
+						if nil != err {
+							log.Printf("LPOP|FAIL|%T", err)
+							conn.Close()
+							conn = pool.Get()
+						} else {
+							time.Sleep(100 * time.Millisecond)
+						}
+
+						continue
+					}
+
+					resp := reply.([]byte)
+					businessName, event := decodeCommand(resp)
+					if nil == event {
+						continue
+					}
+
+					//提交到对应business的channel中
+					sourceServer, ok := self.sourceServers[businessName]
+
+					//如果存在则转发出去
+					if ok {
+						sourceServer.buffChannel <- event
+					} else {
+						log.Printf("LOG_SOURCE_MANGER|NO MATCHES SOURCE_SERVER|%s\n", businessName)
+					}
+				}
+			}(k, pool)
+		}
+	}
+
 }
 
 func (self *SourceManager) Close() {
+	self.isRunning = false
+
 	for _, sourceserver := range self.sourceServers {
 		sourceserver.stop()
 	}
@@ -202,6 +253,6 @@ func (self *SourceManager) Close() {
 	for _, flumepool := range self.hp2flumeClientPool {
 		flumepool.FlumePool.Destroy()
 	}
-	self.isRunning = false
+
 	log.Printf("LOG_SOURCE_MANGER|[%s]|STOP\n", self.instancename)
 }
