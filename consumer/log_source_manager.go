@@ -53,7 +53,7 @@ func NewSourceManager(instancename string, option *config.Option) *SourceManager
 	sourcemanager.watcherPool = make(map[string]*config.Watcher)
 
 	//创建使用的Logger
-	basepath := option.LogPath
+	basepath := option.LogPath + "/" + instancename
 	sourcemanager.flumeLog = buildLog(basepath, "flume_tps", "flume_tps.log")
 	sourcemanager.redisLog = buildLog(basepath, "redis_tps", "redis_tps.log")
 	sourcemanager.watcherLog = buildLog(basepath, "zk_watcher", "zk_watcher.log")
@@ -70,10 +70,18 @@ func NewSourceManager(instancename string, option *config.Option) *SourceManager
 }
 
 func buildLog(basepath, logname, filename string) stdlog.Logger {
+
+	_, err := os.Stat(basepath)
+	if nil != err {
+		err := os.MkdirAll(basepath, os.ModePerm)
+		if nil != err {
+			panic(err)
+		}
+	}
+
 	//创建redis的log
 	f, err := os.OpenFile(basepath+"/"+filename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.ModePerm)
 	if nil != err {
-
 		panic(err)
 	}
 	logger := stdlog.Log(logname)
