@@ -15,6 +15,7 @@ import (
 func main() {
 
 	runtime.GOMAXPROCS(4)
+	baseLog := flag.String("logpath", "/home/logs/flume-log", "basic log path ")
 	instancename := flag.String("instancename", "flume-log", "instance name ")
 	queuename := flag.String("queuename", "user-log", "config queuename ")
 	redisHost := flag.String("redis", "redis_node_6008:6008", "redishost")
@@ -36,7 +37,7 @@ func main() {
 	}
 
 	businessArr := strings.Split(*business, ",")
-	option := config.NewOption(businessArr, *zkhost, queueHosts)
+	option := config.NewOption(*baseLog, businessArr, *zkhost, queueHosts)
 	sourcemanager := consumer.NewSourceManager(*instancename, option)
 
 	sourcemanager.Start()

@@ -5,6 +5,7 @@ import (
 	"flume-log-sdk/config"
 	"flume-log-sdk/consumer/pool"
 	"github.com/blackbeans/redigo/redis"
+	"github.com/momotech/GoRedis/libs/stdlog"
 	"log"
 	"os"
 	"strconv"
@@ -38,6 +39,10 @@ type SourceManager struct {
 	isRunning bool
 
 	instancename string
+
+	flumeLog   stdlog.Logger
+	redisLog   stdlog.Logger
+	watcherLog stdlog.Logger
 }
 
 func NewSourceManager(instancename string, option *config.Option) *SourceManager {
@@ -46,6 +51,13 @@ func NewSourceManager(instancename string, option *config.Option) *SourceManager
 	sourcemanager.sourceServers = make(map[string]*SourceServer)
 	sourcemanager.hp2flumeClientPool = make(map[config.HostPort]*pool.FlumePoolLink)
 	sourcemanager.watcherPool = make(map[string]*config.Watcher)
+
+	//创建使用的Logger
+	basepath := option.LogPath
+	sourcemanager.flumeLog = buildLog(basepath, "flume_tps", "flume_tps.log")
+	sourcemanager.redisLog = buildLog(basepath, "redis_tps", "redis_tps.log")
+	sourcemanager.watcherLog = buildLog(basepath, "zk_watcher", "zk_watcher.log")
+
 	sourcemanager.redispool = initRedisQueue(option)
 	//从zk中拉取flumenode的配置
 	zkmanager := config.NewZKManager(option.Zkhost)
@@ -55,6 +67,18 @@ func NewSourceManager(instancename string, option *config.Option) *SourceManager
 	sourcemanager.initSourceServers(option.Businesses, zkmanager)
 	return sourcemanager
 
+}
+
+func buildLog(basepath, logname, filename string) stdlog.Logger {
+	//创建redis的log
+	f, err := os.OpenFile(basepath+"/"+filename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.ModePerm)
+	if nil != err {
+
+		panic(err)
+	}
+	logger := stdlog.Log(logname)
+	logger.SetOutput(f)
+	return logger
 }
 
 func initRedisQueue(option *config.Option) map[string][]*poolwrapper {

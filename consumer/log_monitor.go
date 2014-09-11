@@ -3,13 +3,13 @@ package consumer
 import (
 	"flume-log-sdk/config"
 	"fmt"
-	"log"
 	"sort"
 	"strconv"
 	"time"
 )
 
 func (self *SourceManager) monitorFlume() {
+
 	for self.isRunning {
 		time.Sleep(1 * time.Second)
 		monitor := "FLUME_TPS|"
@@ -18,10 +18,11 @@ func (self *SourceManager) monitorFlume() {
 			succ, fail := v.monitor()
 			monitor += fmt.Sprintf("%s|%d/%d \t", k, succ, fail)
 		}
-		log.Println(monitor)
+
+		self.flumeLog.Println(monitor)
 
 		mk := make([]string, 0)
-		monitor = "FLUME_POOL|\n"
+		monitor = "FLUME_POOL|"
 		for k, _ := range self.hp2flumeClientPool {
 			mk = append(mk, k.Host+":"+strconv.Itoa(k.Port))
 		}
@@ -33,27 +34,24 @@ func (self *SourceManager) monitorFlume() {
 				continue
 			}
 			active, core, max := v.FlumePool.MonitorPool()
-			monitor += fmt.Sprintf("%s|%d/%d/%d\n", hp, active, core, max)
+			monitor += fmt.Sprintf("%s|%d/%d/%d ", hp, active, core, max)
 		}
 
-		log.Println(monitor)
+		self.flumeLog.Println(monitor)
 		self.monitorRedis()
 	}
 }
 
 func (self *SourceManager) monitorRedis() {
-	for self.isRunning {
-		time.Sleep(1 * time.Second)
-		monitor := "REDIS_TPS|"
-		for k, v := range self.redispool {
-			//队列K
-			monitor += k
-			for _, poolw := range v {
-				cost := (poolw.currValue - poolw.lastValue)
-				poolw.lastValue = poolw.currValue
-				monitor += fmt.Sprintf("|%s|%d \t", poolw.hostport.Host+":"+strconv.Itoa((poolw.hostport.Port)), cost)
-			}
+	monitor := "REDIS_TPS|"
+	for k, v := range self.redispool {
+		//队列K
+		monitor += k
+		for _, poolw := range v {
+			cost := (poolw.currValue - poolw.lastValue)
+			poolw.lastValue = poolw.currValue
+			monitor += fmt.Sprintf("|%s|%d \t", poolw.hostport.Host+":"+strconv.Itoa((poolw.hostport.Port)), cost)
 		}
-		log.Println(monitor)
 	}
+	self.redisLog.Println(monitor)
 }

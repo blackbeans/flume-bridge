@@ -28,6 +28,7 @@ func NewHostPort(hp string) HostPort {
 
 //启动设置的选项
 type Option struct {
+	LogPath    string
 	Businesses []string
 
 	Zkhost string //zookeeper的Host
@@ -36,9 +37,9 @@ type Option struct {
 
 }
 
-func NewOption(businesses []string, zkhosts string, hostPorts []QueueHostPort) *Option {
+func NewOption(logPath string, businesses []string, zkhosts string, hostPorts []QueueHostPort) *Option {
 
-	return &Option{Businesses: businesses, Zkhost: zkhosts, QueueHostPorts: hostPorts}
+	return &Option{LogPath: logPath, Businesses: businesses, Zkhost: zkhosts, QueueHostPorts: hostPorts}
 }
 
 //command

@@ -3,7 +3,6 @@ package consumer
 import (
 	"flume-log-sdk/config"
 	"flume-log-sdk/consumer/pool"
-	"log"
 )
 
 type FlumeWatcher struct {
@@ -29,9 +28,9 @@ func (self *FlumeWatcher) BusinessWatcher(business string, eventType config.ZkEv
 			for e := val.flumeClientPool.Back(); nil != e; e = e.Prev() {
 				self.clearPool(business, e.Value.(*pool.FlumePoolLink))
 			}
-			log.Printf("business:[%s] deleted\n", business)
+			self.sourcemanger.watcherLog.Printf("business:[%s] deleted\n", business)
 		} else {
-			log.Printf("business:[%s] not exist !\n", business)
+			self.sourcemanger.watcherLog.Printf("business:[%s] not exist !\n", business)
 		}
 	}
 }
@@ -44,7 +43,7 @@ func (self *FlumeWatcher) clearPool(business string, pool *pool.FlumePoolLink) {
 		pool.FlumePool.Destroy()
 		hp := pool.FlumePool.GetHostPort()
 		delete(self.sourcemanger.hp2flumeClientPool, pool.FlumePool.GetHostPort())
-		log.Printf("WATCHER|REMOVE FLUME:%s\n", hp)
+		self.sourcemanger.watcherLog.Printf("WATCHER|REMOVE FLUME:%s\n", hp)
 	}
 	pool.Mutex.Unlock()
 	pool = nil
@@ -82,7 +81,7 @@ func (self *FlumeWatcher) ChildWatcher(business string, childNode []config.HostP
 				val.flumeClientPool.Remove(e)
 				self.clearPool(business, link)
 				//从Business的clientpool中移除该client
-				log.Printf("WATCHER|BUSINESS:%s|REMOVE FLUME:%s|SIZE:[%d,%d]\n",
+				self.sourcemanger.watcherLog.Printf("WATCHER|BUSINESS:%s|REMOVE FLUME:%s|SIZE:[%d,%d]\n",
 					business, hp, size, val.flumeClientPool.Len())
 			}
 		}
@@ -98,7 +97,7 @@ func (self *FlumeWatcher) ChildWatcher(business string, childNode []config.HostP
 				if !fpool.IsAttached(business) {
 					val.flumeClientPool.PushFront(fpool)
 					fpool.AttachBusiness(business)
-					log.Printf("WATCHER|BUSINESS:[%s]|ADD POOL|[%s]\n", business, hp)
+					self.sourcemanger.watcherLog.Printf("WATCHER|BUSINESS:[%s]|ADD POOL|[%s]\n", business, hp)
 				}
 				//如果已经包含了，则啥事都不干
 
@@ -110,7 +109,7 @@ func (self *FlumeWatcher) ChildWatcher(business string, childNode []config.HostP
 					val.flumeClientPool.PushFront(poollink)
 					poollink.AttachBusiness(business)
 				} else if nil != err {
-					log.Printf("WATCHER|BUSINESS:[%s]|ADD POOL|FAIL|[%s]|%s\n", business, hp, err.Error())
+					self.sourcemanger.watcherLog.Printf("WATCHER|BUSINESS:[%s]|ADD POOL|FAIL|[%s]|%s\n", business, hp, err.Error())
 				}
 			}
 		}
