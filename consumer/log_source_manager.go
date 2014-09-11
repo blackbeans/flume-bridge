@@ -198,7 +198,7 @@ func (self *SourceManager) Start() {
 		v.start()
 	}
 	self.isRunning = true
-	go self.monitorFlume()
+	go self.monitor()
 	log.Printf("LOG_SOURCE_MANGER|[%s]|STARTED\n", self.instancename)
 	self.startWorker()
 
