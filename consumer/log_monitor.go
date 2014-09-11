@@ -22,7 +22,7 @@ func (self *SourceManager) monitorFlume() {
 		}
 
 		sort.Strings(mk)
-		monitor := "FLUME_TPS|"
+		monitor := "--------------------------FLUME_TPS--------------------------------\n"
 		for _, v := range mk {
 			monitor += v
 		}
@@ -30,7 +30,6 @@ func (self *SourceManager) monitorFlume() {
 
 		//---------------flumepool-----------
 		mk = make([]string, 0)
-		monitor = "FLUME_POOL|"
 
 		for k, _ := range self.hp2flumeClientPool {
 
@@ -39,7 +38,7 @@ func (self *SourceManager) monitorFlume() {
 
 		}
 		sort.Strings(mk)
-
+		monitor = "--------------------------FLUME_POOL--------------------------------\n"
 		i := 0
 		for _, hp := range mk {
 			v, ok := self.hp2flumeClientPool[config.NewHostPort(hp)]
@@ -48,8 +47,8 @@ func (self *SourceManager) monitorFlume() {
 			}
 			i++
 			active, core, max := v.FlumePool.MonitorPool()
-			monitor += fmt.Sprintf("%s|%d/%d/%d ", hp, active, core, max)
-			if i%10 == 0 {
+			monitor += fmt.Sprintf("%s|%d/%d/%d\t", hp, active, core, max)
+			if i%5 == 0 {
 				monitor += "\n"
 			}
 		}
