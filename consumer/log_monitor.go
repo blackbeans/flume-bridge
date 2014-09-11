@@ -31,25 +31,27 @@ func (self *SourceManager) monitorFlume() {
 		//---------------flumepool-----------
 		mk = make([]string, 0)
 		monitor = "FLUME_POOL|"
-		i := 0
+
 		for k, _ := range self.hp2flumeClientPool {
-			i++
+
 			item := k.Host + ":" + strconv.Itoa(k.Port)
-			if i%10 == 0 {
-				item += "\n"
-			}
 			mk = append(mk, item)
 
 		}
 		sort.Strings(mk)
 
+		i := 0
 		for _, hp := range mk {
 			v, ok := self.hp2flumeClientPool[config.NewHostPort(hp)]
 			if !ok {
 				continue
 			}
+			i++
 			active, core, max := v.FlumePool.MonitorPool()
 			monitor += fmt.Sprintf("%s|%d/%d/%d ", hp, active, core, max)
+			if i%10 == 0 {
+				monitor += "\n"
+			}
 		}
 
 		self.flumeLog.Println(monitor)
