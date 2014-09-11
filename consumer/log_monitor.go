@@ -12,19 +12,34 @@ func (self *SourceManager) monitorFlume() {
 
 	for self.isRunning {
 		time.Sleep(1 * time.Second)
-		monitor := "FLUME_TPS|"
-		for k, v := range self.sourceServers {
+		//---------------flumetps-----------
+		mk := make([]string, 0)
 
-			succ, fail := v.monitor()
-			monitor += fmt.Sprintf("%s|%d/%d \t", k, succ, fail)
+		for k, v := range self.sourceServers {
+			succ, fail, bufferSize := v.monitor()
+			item := fmt.Sprintf("%s|%d/%d/%d \t", k, succ, fail, bufferSize)
+			mk = append(mk, item)
 		}
 
+		sort.Strings(mk)
+		monitor := "FLUME_TPS|"
+		for _, v := range mk {
+			monitor += v
+		}
 		self.flumeLog.Println(monitor)
 
-		mk := make([]string, 0)
+		//---------------flumepool-----------
+		mk = make([]string, 0)
 		monitor = "FLUME_POOL|"
+		i := 0
 		for k, _ := range self.hp2flumeClientPool {
-			mk = append(mk, k.Host+":"+strconv.Itoa(k.Port))
+			i++
+			item := k.Host + ":" + strconv.Itoa(k.Port)
+			if i%10 == 0 {
+				item += "\n"
+			}
+			mk = append(mk, item)
+
 		}
 		sort.Strings(mk)
 

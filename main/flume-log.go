@@ -5,6 +5,8 @@ import (
 	"flume-log-sdk/config"
 	"flume-log-sdk/consumer"
 	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"runtime"
@@ -13,6 +15,10 @@ import (
 )
 
 func main() {
+
+	go func() {
+		log.Println(http.ListenAndServe("localhost:7071", nil))
+	}()
 
 	runtime.GOMAXPROCS(4)
 	baseLog := flag.String("logpath", "/home/logs/flume-log", "basic log path ")

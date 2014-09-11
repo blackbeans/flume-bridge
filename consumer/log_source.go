@@ -37,7 +37,7 @@ type SourceServer struct {
 
 func newSourceServer(business string, flumePool *list.List) (server *SourceServer) {
 	batchSize := 300
-	sendbuff := 100
+	sendbuff := 500
 	buffChannel := make(chan *flume.ThriftFlumeEvent, sendbuff)
 	sourceServer := &SourceServer{
 		business:        business,
@@ -47,13 +47,16 @@ func newSourceServer(business string, flumePool *list.List) (server *SourceServe
 	return sourceServer
 }
 
-func (self *SourceServer) monitor() (succ, fail int64) {
+func (self *SourceServer) monitor() (succ, fail int64, bufferSize int) {
 	currSucc := self.monitorCount.currSuccValue
 	currFail := self.monitorCount.currFailValue
 	succ = (currSucc - self.monitorCount.lastSuccValue)
 	fail = (currFail - self.monitorCount.lastFailValue)
 	self.monitorCount.lastSuccValue = currSucc
 	self.monitorCount.lastFailValue = currFail
+
+	//自己的Buffer大小
+	bufferSize = len(self.buffChannel)
 	return
 }
 
