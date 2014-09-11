@@ -40,9 +40,10 @@ type SourceManager struct {
 
 	instancename string
 
-	flumeLog   stdlog.Logger
-	redisLog   stdlog.Logger
-	watcherLog stdlog.Logger
+	flumeLog     stdlog.Logger
+	redisLog     stdlog.Logger
+	watcherLog   stdlog.Logger
+	flumePoolLog stdlog.Logger
 }
 
 func NewSourceManager(instancename string, option *config.Option) *SourceManager {
@@ -55,6 +56,7 @@ func NewSourceManager(instancename string, option *config.Option) *SourceManager
 	//创建使用的Logger
 	basepath := option.LogPath + "/" + instancename
 	sourcemanager.flumeLog = buildLog(basepath, "flume_tps", "flume_tps.log")
+	sourcemanager.flumePoolLog = buildLog(basepath, "flume_pool", "flume_pool.log")
 	sourcemanager.redisLog = buildLog(basepath, "redis_tps", "redis_tps.log")
 	sourcemanager.watcherLog = buildLog(basepath, "zk_watcher", "zk_watcher.log")
 

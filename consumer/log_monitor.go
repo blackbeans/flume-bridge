@@ -11,6 +11,8 @@ import (
 func (self *SourceManager) monitorFlume() {
 
 	for self.isRunning {
+		now := time.Now()
+		nt := now.Format("2006-01-02 15:04:05")
 		time.Sleep(1 * time.Second)
 		//---------------flumetps-----------
 		mk := make([]string, 0)
@@ -22,7 +24,11 @@ func (self *SourceManager) monitorFlume() {
 		}
 
 		sort.Strings(mk)
-		monitor := "--------------------------FLUME_TPS--------------------------------\n"
+		monitor := ""
+		if now.Second()%10 == 0 {
+			monitor += "------------------------" + nt + "------------------------\n"
+		}
+
 		for _, v := range mk {
 			monitor += v
 		}
@@ -38,7 +44,11 @@ func (self *SourceManager) monitorFlume() {
 
 		}
 		sort.Strings(mk)
-		monitor = "--------------------------FLUME_POOL--------------------------------\n"
+
+		monitor = ""
+		if now.Second()%10 == 0 {
+			monitor += "------------------------" + nt + "------------------------\n"
+		}
 		i := 0
 		for _, hp := range mk {
 			v, ok := self.hp2flumeClientPool[config.NewHostPort(hp)]
@@ -53,7 +63,7 @@ func (self *SourceManager) monitorFlume() {
 			}
 		}
 
-		self.flumeLog.Println(monitor)
+		self.flumePoolLog.Println(monitor)
 		self.monitorRedis()
 	}
 }
