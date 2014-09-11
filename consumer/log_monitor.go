@@ -33,7 +33,7 @@ func (self *SourceManager) monitorFlumeTPS(nt string) {
 	sort.Strings(mk)
 	monitor := nt + "\t"
 	for _, v := range mk {
-		monitor += v
+		monitor += v + "\t"
 	}
 	self.flumeLog.Println(monitor)
 }
@@ -48,16 +48,15 @@ func (self *SourceManager) monitorFlumePool(nt string) {
 		ports, ok := mk[k.Host]
 		if !ok {
 			ports = make([]int, 0)
-			mk[k.Host] = ports
 			hosts = append(hosts, k.Host)
 		}
 		ports = append(ports, k.Port)
+		mk[k.Host] = ports
 	}
 	sort.Strings(hosts)
-
 	for _, hp := range hosts {
 		i := 0
-		monitor := nt + "|" + hp + "\t"
+		monitor := nt + "|" + hp + "\n"
 		ports, _ := mk[hp]
 		for _, port := range ports {
 			v, ok := self.hp2flumeClientPool[config.NewHostPort(hp+":"+strconv.Itoa(port))]
@@ -67,15 +66,16 @@ func (self *SourceManager) monitorFlumePool(nt string) {
 
 			i++
 			active, core, max := v.FlumePool.MonitorPool()
-			monitor += fmt.Sprintf("%s:%d/%d/%d\t", port, active, core, max)
+			monitor += fmt.Sprintf("%d:%d/%d/%d\t", port, active, core, max)
 			if i%5 == 0 {
-				self.flumePoolLog.Println(monitor)
+				monitor += "\n"
 			}
-			monitor = nt + "|" + hp + "\t"
 		}
+		self.flumePoolLog.Println(monitor)
 	}
 
 }
+
 func (self *SourceManager) monitorRedis(nt string) {
 	monitor := nt + "\t"
 	for k, v := range self.redispool {
