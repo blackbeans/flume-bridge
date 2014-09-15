@@ -10,15 +10,12 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 )
 
 func main() {
-
-	go func() {
-		log.Println(http.ListenAndServe("localhost:7071", nil))
-	}()
 
 	runtime.GOMAXPROCS(4)
 	baseLog := flag.String("logpath", "/home/logs/flume-log", "basic log path ")
@@ -29,7 +26,14 @@ func main() {
 
 	zkhost := flag.String("zkhost", "momo-zk-001.m6:2210,momo-zk-002.m6:2210,momo-zk-003.m6:2210", "zkhost")
 	business := flag.String("businesses", "location", " businesses")
+	pprofPort := flag.Int("pport", -1, "pprof port default value is -1 ")
 	flag.Parse()
+
+	go func() {
+		if *pprofPort > 0 {
+			log.Println(http.ListenAndServe("localhost:"+strconv.Itoa(*pprofPort), nil))
+		}
+	}()
 
 	maxconn := *redisconns
 	maxIdelTime := 5

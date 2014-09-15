@@ -20,10 +20,13 @@ const (
 )
 
 type FlumeClient struct {
-	host         string
-	port         int
-	tsocket      *thrift.TSocket
-	transport    thrift.TTransport
+	host             string
+	port             int
+	tsocket          *thrift.TSocket
+	transport        thrift.TTransport
+	transportFactory thrift.TTransportFactory
+	protocolFactory  *thrift.TCompactProtocolFactory
+
 	thriftclient *flume.ThriftSourceProtocolClient
 	status       Status //连接状态
 }
@@ -51,26 +54,25 @@ func (self *FlumeClient) Connect() error {
 	}
 
 	self.tsocket = tsocket
-
-	transportFactory := thrift.NewTFramedTransportFactory(thrift.NewTTransportFactory())
-
+	self.transportFactory = thrift.NewTFramedTransportFactory(thrift.NewTTransportFactory())
 	//TLV 方式传输
-	protocolFactory := thrift.NewTCompactProtocolFactory()
+	self.protocolFactory = thrift.NewTCompactProtocolFactory()
 
+	self.clientConn()
+	self.status = STATUS_READY
+	go self.checkAlive()
+
+	return nil
+}
+
+func (self *FlumeClient) clientConn() error {
 	//使用非阻塞io来传输
-	self.transport = transportFactory.GetTransport(tsocket)
-
-	self.thriftclient = flume.NewThriftSourceProtocolClientFactory(self.transport, protocolFactory)
-
+	self.transport = self.transportFactory.GetTransport(self.tsocket)
+	self.thriftclient = flume.NewThriftSourceProtocolClientFactory(self.transport, self.protocolFactory)
 	if err := self.transport.Open(); nil != err {
 		log.Printf("FLUME_CLIENT|CREATE THRIFT CLIENT|FAIL|%s|%s", self.HostPort(), err)
 		return err
 	}
-
-	self.status = STATUS_READY
-
-	go self.checkAlive()
-
 	return nil
 }
 
@@ -103,24 +105,25 @@ func (self *FlumeClient) Append(event *flume.ThriftFlumeEvent) error {
 
 func (self *FlumeClient) innerSend(sendfunc func() (flume.Status, error)) error {
 
-	if self.status == STATUS_DEAD || !self.tsocket.IsOpen() {
+	if self.status == STATUS_DEAD {
 		return errors.New("FLUME_CLIENT|DEAD|" + self.HostPort())
 	}
 
-	//如如果transport关闭了那么久重新打开
+	//如果transport关闭了那么久重新打开
 	if !self.transport.IsOpen() {
-		if err := self.transport.Open(); nil != err {
+		//重新建立thriftclient
+		err := self.clientConn()
+		if nil != err {
+			log.Printf("FLUME_CLIENT|SEND EVENT|CLIENT CONN | CREATE FAIL|%s\n", err.Error())
 			return err
 		}
-
 	}
 
 	status, err := sendfunc()
 	if nil != err {
-		log.Printf("FLUME_CLIENT|SEND EVENT|FAIL|%s|STATUS:%s ", err.Error(), status)
+		log.Printf("FLUME_CLIENT|SEND EVENT|FAIL|%s|STATUS:%s\n", err.Error(), status)
 		status = flume.Status_ERROR
-		self.status = STATUS_DEAD
-
+		// self.status = STATUS_DEAD
 	}
 
 	//如果没有成功则向上抛出
@@ -134,9 +137,8 @@ func (self *FlumeClient) Destroy() {
 
 	self.status = STATUS_DEAD
 	err := self.transport.Close()
-	self.tsocket.Close()
 	if nil != err {
-		log.Panicln(err.Error())
+		log.Println(err.Error())
 	}
 
 }
