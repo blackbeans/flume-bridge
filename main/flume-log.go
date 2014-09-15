@@ -31,7 +31,7 @@ func main() {
 
 	go func() {
 		if *pprofPort > 0 {
-			log.Println(http.ListenAndServe("localhost:"+strconv.Itoa(*pprofPort), nil))
+			log.Println(http.ListenAndServe(":"+strconv.Itoa(*pprofPort), nil))
 		}
 	}()
 
