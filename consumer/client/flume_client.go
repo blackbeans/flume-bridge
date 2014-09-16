@@ -123,7 +123,7 @@ func (self *FlumeClient) innerSend(sendfunc func() (flume.Status, error)) error 
 	if nil != err {
 		log.Printf("FLUME_CLIENT|SEND EVENT|FAIL|%s|STATUS:%s\n", err.Error(), status)
 		status = flume.Status_ERROR
-		// self.status = STATUS_DEAD
+		self.status = STATUS_DEAD
 	}
 
 	//如果没有成功则向上抛出
