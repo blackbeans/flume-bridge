@@ -40,10 +40,11 @@ type SourceManager struct {
 
 	instancename string
 
-	flumeLog     stdlog.Logger
-	redisLog     stdlog.Logger
-	watcherLog   stdlog.Logger
-	flumePoolLog stdlog.Logger
+	flumeLog       stdlog.Logger
+	redisLog       stdlog.Logger
+	watcherLog     stdlog.Logger
+	flumePoolLog   stdlog.Logger
+	flumeSourceLog stdlog.Logger
 }
 
 func NewSourceManager(instancename string, option *config.Option) *SourceManager {
@@ -59,6 +60,7 @@ func NewSourceManager(instancename string, option *config.Option) *SourceManager
 	sourcemanager.flumePoolLog = buildLog(basepath, "flume_pool", "flume_pool.log")
 	sourcemanager.redisLog = buildLog(basepath, "redis_tps", "redis_tps.log")
 	sourcemanager.watcherLog = buildLog(basepath, "zk_watcher", "zk_watcher.log")
+	sourcemanager.flumeSourceLog = buildLog(basepath, "flume_source", "flume_source.log")
 
 	sourcemanager.redispool = initRedisQueue(option)
 	//从zk中拉取flumenode的配置
@@ -186,7 +188,7 @@ func (self *SourceManager) initSourceServer(business string, flumenodes []config
 	}
 
 	//创建一个sourceserver
-	sourceserver := newSourceServer(business, pools)
+	sourceserver := newSourceServer(business, pools, self.flumeSourceLog)
 	self.sourceServers[business] = sourceserver
 	return sourceserver
 
