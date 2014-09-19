@@ -40,11 +40,12 @@ type SourceManager struct {
 
 	instancename string
 
-	flumeLog       stdlog.Logger
-	redisLog       stdlog.Logger
-	watcherLog     stdlog.Logger
-	flumePoolLog   stdlog.Logger
-	flumeSourceLog stdlog.Logger
+	flumeLog         stdlog.Logger
+	redisLog         stdlog.Logger
+	watcherLog       stdlog.Logger
+	flumePoolLog     stdlog.Logger
+	flumeSourceLog   stdlog.Logger
+	sourceManagerLog stdlog.Logger
 }
 
 func NewSourceManager(instancename string, option *config.Option) *SourceManager {
@@ -56,6 +57,7 @@ func NewSourceManager(instancename string, option *config.Option) *SourceManager
 
 	//创建使用的Logger
 	basepath := option.LogPath + "/" + instancename
+	sourcemanager.sourceManagerLog = buildLog(basepath, "source_manager", "source_manager.log")
 	sourcemanager.flumeLog = buildLog(basepath, "flume_tps", "flume_tps.log")
 	sourcemanager.flumePoolLog = buildLog(basepath, "flume_pool", "flume_pool.log")
 	sourcemanager.redisLog = buildLog(basepath, "redis_tps", "redis_tps.log")
@@ -145,12 +147,12 @@ func (self *SourceManager) initSourceServer(business string, flumenodes []config
 	//首先判断当前是否该sink支持该种business
 	_, ok := self.watcherPool[business]
 	if !ok {
-		log.Printf("unsupport business[%s],HostPorts:[%s]\n", business, flumenodes)
+		self.sourceManagerLog.Printf("unsupport business[%s],HostPorts:[%s]\n", business, flumenodes)
 		return nil
 	}
 
 	if len(flumenodes) == 0 {
-		log.Println("no valid flume agent node for [" + business + "]")
+		self.sourceManagerLog.Println("no valid flume agent node for [" + business + "]")
 		return nil
 	}
 
@@ -162,7 +164,7 @@ func (self *SourceManager) initSourceServer(business string, flumenodes []config
 		if !ok {
 			err, tmppool := pool.NewFlumePoolLink(hp)
 			if nil != err {
-				log.Println("SOURCE_MANGER|INIT FLUMEPOOLLINE|FAIL|%s", err)
+				self.sourceManagerLog.Println("SOURCE_MANGER|INIT FLUMEPOOLLINE|FAIL|%s", err)
 				continue
 			}
 			poollink = tmppool
@@ -174,7 +176,7 @@ func (self *SourceManager) initSourceServer(business string, flumenodes []config
 				return
 			}
 			if err := recover(); nil != err {
-				log.Printf("SOURCE_MANGER|CREATE FLUMECLIENT|FAIL|[%s]\n", hp)
+				self.sourceManagerLog.Printf("SOURCE_MANGER|CREATE FLUMECLIENT|FAIL|[%s]\n", hp)
 				poollink = nil
 			}
 		}()
@@ -201,7 +203,7 @@ func (self *SourceManager) Start() {
 	}
 	self.isRunning = true
 	go self.monitor()
-	log.Printf("LOG_SOURCE_MANGER|[%s]|STARTED\n", self.instancename)
+	self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|[%s]|STARTED\n", self.instancename)
 	self.startWorker()
 
 }
@@ -209,7 +211,7 @@ func (self *SourceManager) Start() {
 func (self *SourceManager) startWorker() {
 
 	for k, v := range self.redispool {
-		log.Println("LOG_SOURCE|REDIS|[" + k + "]|START")
+		self.sourceManagerLog.Println("LOG_SOURCE|REDIS|[" + k + "]|START")
 		for _, pool := range v {
 
 			go func(queuename string, pool *poolwrapper) {
@@ -222,7 +224,7 @@ func (self *SourceManager) startWorker() {
 					reply, err := conn.Do("LPOP", queuename)
 					if nil != err || nil == reply {
 						if nil != err {
-							log.Printf("LPOP|FAIL|%T", err)
+							self.sourceManagerLog.Printf("LPOP|FAIL|%T", err)
 							conn.Close()
 							conn = pool.rpool.Get()
 						} else {
@@ -244,12 +246,19 @@ func (self *SourceManager) startWorker() {
 					//提交到对应business的channel中
 					sourceServer, ok := self.sourceServers[businessName]
 
-					//如果存在则转发出去
-					if ok {
+					//如果存在并且sourceServer没有停止则转发出去
+					if ok && !sourceServer.isStop {
 						sourceServer.buffChannel <- event
+
 					} else {
-						log.Printf("LOG_SOURCE_MANGER|NO MATCHES SOURCE_SERVER|%s\n", businessName)
+						self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|NO MATCHES SOURCE_SERVER|%s\n", businessName)
 					}
+
+					defer func() {
+						if err := recover(); nil != err {
+							self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|PANIC|%s", err)
+						}
+					}()
 				}
 			}(k, pool)
 		}
