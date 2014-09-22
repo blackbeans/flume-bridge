@@ -130,13 +130,6 @@ func (self *SourceServer) innerSend(events []*flume.ThriftFlumeEvent) {
 			} else {
 				pool.Release(flumeclient)
 			}
-
-			//归还event对线到池子中
-			defer func() {
-				for _, v := range events {
-					objpool.Put(*v)
-				}
-			}()
 		}()
 
 		if nil != err {
@@ -152,6 +145,13 @@ func (self *SourceServer) innerSend(events []*flume.ThriftFlumeEvent) {
 		}
 
 	}
+
+	//归还event对线到池子中
+	defer func() {
+		for _, v := range events {
+			objpool.Put(*v)
+		}
+	}()
 }
 
 //解析出decodecommand
