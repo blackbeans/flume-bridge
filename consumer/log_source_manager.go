@@ -92,6 +92,11 @@ func buildLog(basepath, logname, filename string) stdlog.Logger {
 	}
 	logger := stdlog.Log(logname)
 	logger.SetOutput(f)
+	logger.SetPrefix(func() string {
+		now := time.Now()
+		nt := now.Format("2006-01-02 15:04:05")
+		return nt
+	})
 	return logger
 }
 
@@ -260,6 +265,7 @@ func (self *SourceManager) startWorker() {
 						}
 					}()
 				}
+				self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|REDIS-POP|EXIT|%s|", queuename, self.instancename)
 			}(k, pool)
 		}
 	}

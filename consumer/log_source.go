@@ -92,7 +92,7 @@ func (self *SourceServer) start() {
 				continue
 			}
 			sendbuff <- pack[:len(pack)]
-			pack = make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
+			// pack = make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
 		}
 
 		close(sendbuff)
