@@ -143,16 +143,20 @@ func (self *FlumeClient) Destroy() {
 
 }
 
-func NewFlumeEvent(business, action string, body []byte) *flume.ThriftFlumeEvent {
+func NewFlumeEvent() flume.ThriftFlumeEvent {
+	return *flume.NewThriftFlumeEvent()
+}
+
+func EventFillUp(obji interface{}, business, action string, body []byte) *flume.ThriftFlumeEvent {
+	event := obji.(flume.ThriftFlumeEvent)
 	//拼装头部信息
 	header := make(map[string]string, 2)
 	header["businessName"] = business
 	header["type"] = action
-	event := flume.NewThriftFlumeEvent()
 	event.Headers = header
 	event.Body = body
 
-	return event
+	return &event
 }
 
 func (self *FlumeClient) HostPort() string {

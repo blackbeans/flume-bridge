@@ -11,6 +11,7 @@ import (
 	"github.com/momotech/GoRedis/libs/stdlog"
 	"log"
 	"math/rand"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -25,8 +26,18 @@ type counter struct {
 	currFailValue int64
 }
 
-// 用于向flume中作为sink 通过thrift客户端写入日志
+//生成对象池用于缓存 thriftEvent对象
+var objpool *sync.Pool
 
+func init() {
+	objpool = &sync.Pool{}
+	objpool.New = func() interface{} {
+		//创建生成thriftevent的
+		return client.NewFlumeEvent()
+	}
+}
+
+// 用于向flume中作为sink 通过thrift客户端写入日志
 type SourceServer struct {
 	flumeClientPool *list.List
 	isStop          bool
@@ -119,6 +130,13 @@ func (self *SourceServer) innerSend(events []*flume.ThriftFlumeEvent) {
 			} else {
 				pool.Release(flumeclient)
 			}
+
+			//归还event对线到池子中
+			defer func() {
+				for _, v := range events {
+					objpool.Put(*v)
+				}
+			}()
 		}()
 
 		if nil != err {
@@ -165,7 +183,9 @@ func decodeCommand(resp []byte) (string, *flume.ThriftFlumeEvent) {
 
 	//拼Body
 	flumeBody := fmt.Sprintf("%s\t%s\t%s", momoid, action, string(body))
-	event := client.NewFlumeEvent(businessName, action, []byte(flumeBody))
+	obj := objpool.Get()
+	event := client.EventFillUp(obj, businessName, action, []byte(flumeBody))
+	// event := client.NewFlumeEvent(businessName, action, []byte(flumeBody))
 	return businessName, event
 }
 
