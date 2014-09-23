@@ -26,14 +26,25 @@ type counter struct {
 	currFailValue int64
 }
 
+const (
+	batchSize = 1000
+	sendbuff  = 100000
+)
+
 //生成对象池用于缓存 thriftEvent对象
 var objpool *sync.Pool
+var eventPool *sync.Pool
 
 func init() {
 	objpool = &sync.Pool{}
 	objpool.New = func() interface{} {
 		//创建生成thriftevent的
 		return client.NewFlumeEvent()
+	}
+
+	eventPool = &sync.Pool{}
+	eventPool.New = func() interface{} {
+		return make([]*flume.ThriftFlumeEvent, 0, batchSize)
 	}
 }
 
@@ -49,8 +60,6 @@ type SourceServer struct {
 }
 
 func newSourceServer(business string, flumePool *list.List, sourceLog stdlog.Logger) (server *SourceServer) {
-	batchSize := 2000
-	sendbuff := 100000
 	buffChannel := make(chan *flume.ThriftFlumeEvent, sendbuff)
 	sourceServer := &SourceServer{
 		business:        business,
@@ -80,30 +89,41 @@ func (self *SourceServer) start() {
 	self.isStop = false
 
 	//创建chan ,buffer 为10
-	sendbuff := make(chan []*flume.ThriftFlumeEvent, self.batchSize)
+	sendbuff := make(chan []*flume.ThriftFlumeEvent, 1000)
 	//启动20个go程从channel获取
 	for i := 0; i < 10; i++ {
 		go func(ch chan []*flume.ThriftFlumeEvent) {
 			for !self.isStop {
 				events := <-ch
 				self.innerSend(events)
+				//归还当前的数组空间
+				defer func() {
+					eventPool.Put(events)
+				}()
 			}
 		}(sendbuff)
 	}
 
 	go func() {
 		//批量收集数据
-		pack := make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
+		// pack := make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
+		item := eventPool.Get()
+		pack := item.([]*flume.ThriftFlumeEvent)
+		idx := 0
 		for !self.isStop {
 			event := <-self.buffChannel
 			//如果总数大于batchsize则提交
-			if len(pack) < self.batchSize {
+			if idx < self.batchSize {
 				//批量提交
-				pack = append(pack, event)
+				pack[idx] = event
+				idx++
 				continue
 			}
-			sendbuff <- pack[:len(pack)]
-			pack = make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
+
+			sendbuff <- pack[:idx]
+			item = eventPool.Get()
+			pack = item.([]*flume.ThriftFlumeEvent)
+
 		}
 
 		close(sendbuff)
