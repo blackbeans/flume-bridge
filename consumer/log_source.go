@@ -44,7 +44,7 @@ func init() {
 
 	eventPool = &sync.Pool{}
 	eventPool.New = func() interface{} {
-		return make([]flume.ThriftFlumeEvent, batchSize, batchSize)
+		return make([]*flume.ThriftFlumeEvent, batchSize, batchSize)
 	}
 }
 
