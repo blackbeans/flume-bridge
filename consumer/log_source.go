@@ -109,7 +109,7 @@ func (self *SourceServer) start() {
 		pack := make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
 		// item := eventPool.Get()
 		// pack := item.([]*flume.ThriftFlumeEvent)
-		idx := 0
+		// idx := 0
 		for !self.isStop {
 			event := <-self.buffChannel
 
