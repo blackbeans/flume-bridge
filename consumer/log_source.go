@@ -80,7 +80,7 @@ func newSourceServer(business string, flumePool *list.List, sourceLog stdlog.Log
 	return sourceServer
 }
 
-func (self *SourceServer) monitor() (succ, fail int64, bufferSize int) {
+func (self *SourceServer) monitor() (succ, fail int64, bufferSize, arrayPool int) {
 	currSucc := self.monitorCount.currSuccValue
 	currFail := self.monitorCount.currFailValue
 	succ = (currSucc - self.monitorCount.lastSuccValue)
@@ -90,6 +90,7 @@ func (self *SourceServer) monitor() (succ, fail int64, bufferSize int) {
 
 	//自己的Buffer大小
 	bufferSize = len(self.buffChannel)
+	arrayPool = len(self.chpool)
 	return
 }
 
@@ -176,13 +177,6 @@ func (self *SourceServer) innerSend(events []*flume.ThriftFlumeEvent) {
 		}
 
 	}
-
-	//归还event对线到池子中
-	// defer func() {
-	// 	for _, v := range events {
-	// 		objpool.Put(*v)
-	// 	}
-	// }()
 }
 
 //解析出decodecommand

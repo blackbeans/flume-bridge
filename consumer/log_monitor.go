@@ -22,8 +22,8 @@ func (self *SourceManager) monitorFlumeTPS() {
 	//---------------flumetps-----------
 	mk := make([]string, 0)
 	for k, v := range self.sourceServers {
-		succ, fail, bufferSize := v.monitor()
-		item := fmt.Sprintf("%s|%d/%d/%d \t", k, succ, fail, bufferSize)
+		succ, fail, bufferSize, arrayPool := v.monitor()
+		item := fmt.Sprintf("%s|%d/%d/%d/%d \t", k, succ, fail, bufferSize, arrayPool)
 		mk = append(mk, item)
 	}
 
