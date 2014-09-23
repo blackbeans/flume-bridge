@@ -44,7 +44,7 @@ func init() {
 
 	eventPool = &sync.Pool{}
 	eventPool.New = func() interface{} {
-		return make([]*flume.ThriftFlumeEvent, batchSize, batchSize)
+		return make([]*flume.ThriftFlumeEvent, 0, batchSize)
 	}
 }
 
@@ -97,42 +97,29 @@ func (self *SourceServer) start() {
 				events := <-ch
 				self.innerSend(events)
 				// 归还当前的数组空间
-				defer func() {
-					eventPool.Put(events)
-				}()
+				// defer func() {
+				// 	eventPool.Put(events)
+				// }()
 			}
 		}(sendbuff)
 	}
 
 	go func() {
 		//批量收集数据
-		// pack := make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
-		item := eventPool.Get()
-		pack := item.([]*flume.ThriftFlumeEvent)
-		idx := 0
+		pack := make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
+		// item := eventPool.Get()
+		// pack := item.([]*flume.ThriftFlumeEvent)
 		for !self.isStop {
 			event := <-self.buffChannel
 
-			// if len(pack) < self.batchSize {
-			// 	pack = append(pack, event)
-			// 	continue
-			// }
-			// sendbuff <- pack[:len(pack)]
-			// pack = make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
-
-			//如果总数大于batchsize则提交
-			if idx < self.batchSize {
-				//批量提交
-				pack[idx] = event
-				idx++
+			if len(pack) < self.batchSize {
+				pack = append(pack, event)
 				continue
 			}
-
-			sendbuff <- pack[:idx]
-			item = eventPool.Get()
-			pack = item.([]*flume.ThriftFlumeEvent)
-			idx = 0
-
+			sendbuff <- pack[:len(pack)]
+			// item = eventPool.Get()
+			// pack = item.([]*flume.ThriftFlumeEvent)
+			pack = make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
 		}
 
 		close(sendbuff)
@@ -180,11 +167,11 @@ func (self *SourceServer) innerSend(events []*flume.ThriftFlumeEvent) {
 	}
 
 	//归还event对线到池子中
-	defer func() {
-		for _, v := range events {
-			objpool.Put(*v)
-		}
-	}()
+	// defer func() {
+	// 	for _, v := range events {
+	// 		objpool.Put(*v)
+	// 	}
+	// }()
 }
 
 //解析出decodecommand
@@ -216,7 +203,8 @@ func decodeCommand(resp []byte) (string, *flume.ThriftFlumeEvent) {
 
 	//拼Body
 	flumeBody := fmt.Sprintf("%s\t%s\t%s", momoid, action, string(body))
-	obj := objpool.Get()
+	// obj := objpool.Get()
+	obj := client.NewFlumeEvent()
 	event := client.EventFillUp(obj, businessName, action, []byte(flumeBody))
 	// event := client.NewFlumeEvent(businessName, action, []byte(flumeBody))
 	return businessName, event
