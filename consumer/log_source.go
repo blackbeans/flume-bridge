@@ -44,7 +44,7 @@ func init() {
 
 	eventPool = &sync.Pool{}
 	eventPool.New = func() interface{} {
-		return make([]*flume.ThriftFlumeEvent, batchSize, batchSize)
+		return make([]flume.ThriftFlumeEvent, batchSize, batchSize)
 	}
 }
 
@@ -97,9 +97,9 @@ func (self *SourceServer) start() {
 				events := <-ch
 				self.innerSend(events)
 				//归还当前的数组空间
-				defer func() {
-					eventPool.Put(events)
-				}()
+				// defer func() {
+				// 	eventPool.Put(events)
+				// }()
 			}
 		}(sendbuff)
 	}
