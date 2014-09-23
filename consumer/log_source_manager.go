@@ -264,7 +264,7 @@ func (self *SourceManager) startWorker() {
 							self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|NO MATCHES SOURCE_SERVER|%s\n", businessName)
 						}
 					}
-					self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|REDIS-POP|EXIT|%s|", queuename, self.instancename)
+					self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|REDIS-POP|EXIT|%s|%s\n", queuename, self.instancename)
 				}(k, pool)
 			}
 		}

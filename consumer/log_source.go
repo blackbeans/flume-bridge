@@ -57,6 +57,7 @@ type SourceServer struct {
 	batchSize       int
 	buffChannel     chan *flume.ThriftFlumeEvent
 	sourceLog       stdlog.Logger
+	chpool          chan []*flume.ThriftFlumeEvent
 }
 
 func newSourceServer(business string, flumePool *list.List, sourceLog stdlog.Logger) (server *SourceServer) {
@@ -67,6 +68,15 @@ func newSourceServer(business string, flumePool *list.List, sourceLog stdlog.Log
 		batchSize:       batchSize,
 		buffChannel:     buffChannel,
 		sourceLog:       sourceLog}
+
+	//对临时创建的数组切片进行缓存减少gc  50 * 1000 = 5W 个  最多缓存event
+	chpool := make(chan []*flume.ThriftFlumeEvent, 50)
+	for i := 0; i < 50; i++ {
+		chpool <- make([]*flume.ThriftFlumeEvent, 0, sourceServer.batchSize)
+	}
+
+	sourceServer.chpool = chpool
+
 	return sourceServer
 }
 
@@ -89,24 +99,25 @@ func (self *SourceServer) start() {
 	self.isStop = false
 
 	//创建chan ,buffer 为10
-	sendbuff := make(chan []*flume.ThriftFlumeEvent, 1000)
+	sendbuff := make(chan []*flume.ThriftFlumeEvent, 100)
 	//启动20个go程从channel获取
 	for i := 0; i < 10; i++ {
 		go func(ch chan []*flume.ThriftFlumeEvent) {
 			for !self.isStop {
 				events := <-ch
 				self.innerSend(events)
-				// 归还当前的数组空间
-				// defer func() {
-				// 	eventPool.Put(events)
-				// }()
+				defer func() {
+					//回收
+					self.chpool <- events[:0]
+				}()
+
 			}
 		}(sendbuff)
 	}
 
 	go func() {
 		//批量收集数据
-		pack := make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
+		pack := <-self.chpool
 		// item := eventPool.Get()
 		// pack := item.([]*flume.ThriftFlumeEvent)
 		for !self.isStop {
@@ -117,15 +128,14 @@ func (self *SourceServer) start() {
 				continue
 			}
 			sendbuff <- pack[:len(pack)]
-			// item = eventPool.Get()
-			// pack = item.([]*flume.ThriftFlumeEvent)
-			// pack = make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
-			pack = pack[:0]
+			//从池子中获取一个slice
+			pack = <-self.chpool
 		}
 
 		close(sendbuff)
 	}()
 
+	close(self.chpool)
 	self.sourceLog.Printf("LOG_SOURCE|SOURCE SERVER [%s]|STARTED\n", self.business)
 }
 
