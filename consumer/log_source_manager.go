@@ -219,54 +219,49 @@ func (self *SourceManager) startWorker() {
 		self.sourceManagerLog.Println("LOG_SOURCE|REDIS|[" + k + "]|START")
 		for _, pool := range v {
 
-			go func(queuename string, pool *poolwrapper) {
+			for i := 0; i < 10; i++ {
+				go func(queuename string, pool *poolwrapper) {
+					//批量收集数据
+					conn := pool.rpool.Get()
+					defer pool.rpool.Release(conn)
+					for self.isRunning {
 
-				//批量收集数据
-				conn := pool.rpool.Get()
-				defer pool.rpool.Release(conn)
-				for self.isRunning {
+						reply, err := conn.Do("LPOP", queuename)
+						if nil != err || nil == reply {
+							if nil != err {
+								self.sourceManagerLog.Printf("LPOP|FAIL|%T", err)
+								conn.Close()
+								conn = pool.rpool.Get()
+							} else {
+								time.Sleep(100 * time.Millisecond)
+							}
 
-					reply, err := conn.Do("LPOP", queuename)
-					if nil != err || nil == reply {
-						if nil != err {
-							self.sourceManagerLog.Printf("LPOP|FAIL|%T", err)
-							conn.Close()
-							conn = pool.rpool.Get()
+							continue
+						}
+
+						//计数器++
+						pool.currValue++
+
+						resp := reply.([]byte)
+						businessName, event := decodeCommand(resp)
+						if nil == event {
+							continue
+						}
+
+						//提交到对应business的channel中
+						sourceServer, ok := self.sourceServers[businessName]
+
+						//如果存在并且sourceServer没有停止则转发出去
+						if ok && !sourceServer.isStop {
+							sourceServer.buffChannel <- event
+
 						} else {
-							time.Sleep(100 * time.Millisecond)
+							self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|NO MATCHES SOURCE_SERVER|%s\n", businessName)
 						}
-
-						continue
 					}
-
-					//计数器++
-					pool.currValue++
-
-					resp := reply.([]byte)
-					businessName, event := decodeCommand(resp)
-					if nil == event {
-						continue
-					}
-
-					//提交到对应business的channel中
-					sourceServer, ok := self.sourceServers[businessName]
-
-					//如果存在并且sourceServer没有停止则转发出去
-					if ok && !sourceServer.isStop {
-						sourceServer.buffChannel <- event
-
-					} else {
-						self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|NO MATCHES SOURCE_SERVER|%s\n", businessName)
-					}
-
-					defer func() {
-						if err := recover(); nil != err {
-							self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|PANIC|%s", err)
-						}
-					}()
-				}
-				self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|REDIS-POP|EXIT|%s|", queuename, self.instancename)
-			}(k, pool)
+					self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|REDIS-POP|EXIT|%s|", queuename, self.instancename)
+				}(k, pool)
+			}
 		}
 	}
 
