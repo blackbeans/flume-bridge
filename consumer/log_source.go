@@ -115,7 +115,11 @@ func (self *SourceServer) start() {
 func (self *SourceServer) innerSend(events []*flume.ThriftFlumeEvent) {
 
 	for i := 0; i < 3; i++ {
+
 		pool := self.getFlumeClientPool()
+		if nil == pool {
+			continue
+		}
 		flumeclient, err := pool.Get(5 * time.Second)
 		if nil != err || nil == flumeclient {
 			self.sourceLog.Printf("LOG_SOURCE|GET FLUMECLIENT|FAIL|%s|%s|TRY:%d\n", self.business, err, i)
@@ -205,6 +209,9 @@ func (self *SourceServer) getFlumeClientPool() *pool.FlumeClientPool {
 
 	//采用轮训算法
 	e := self.flumeClientPool.Back()
+	if nil == e {
+		return nil
+	}
 	self.flumeClientPool.MoveToFront(e)
 	return e.Value.(*pool.FlumePoolLink).FlumePool
 
