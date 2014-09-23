@@ -120,7 +120,7 @@ func (self *SourceServer) start() {
 			// sendbuff <- pack[:len(pack)]
 			// pack = make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
 
-			如果总数大于batchsize则提交
+			//如果总数大于batchsize则提交
 			if idx < self.batchSize {
 				//批量提交
 				pack[idx] = event
