@@ -106,23 +106,31 @@ func (self *SourceServer) start() {
 
 	go func() {
 		//批量收集数据
-		// pack := make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
-		item := eventPool.Get()
-		pack := item.([]*flume.ThriftFlumeEvent)
+		pack := make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
+		// item := eventPool.Get()
+		// pack := item.([]*flume.ThriftFlumeEvent)
 		idx := 0
 		for !self.isStop {
 			event := <-self.buffChannel
-			//如果总数大于batchsize则提交
-			if idx < self.batchSize {
-				//批量提交
-				pack[idx] = event
-				idx++
-				continue
+
+			if len(pack) < self.batchSize {
+				pack = append(pack, event)
 			}
 
-			sendbuff <- pack[:idx]
-			item = eventPool.Get()
-			pack = item.([]*flume.ThriftFlumeEvent)
+			sendbuff <- pack[:len(pack)]
+			pack = make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
+
+			//如果总数大于batchsize则提交
+			// if idx < self.batchSize {
+			// 	//批量提交
+			// 	pack[idx] = event
+			// 	idx++
+			// 	continue
+			// }
+
+			// sendbuff <- pack[:idx]
+			// item = eventPool.Get()
+			// pack = item.([]*flume.ThriftFlumeEvent)
 
 		}
 
