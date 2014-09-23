@@ -49,8 +49,8 @@ type SourceServer struct {
 }
 
 func newSourceServer(business string, flumePool *list.List, sourceLog stdlog.Logger) (server *SourceServer) {
-	batchSize := 300
-	sendbuff := 500
+	batchSize := 2000
+	sendbuff := 100000
 	buffChannel := make(chan *flume.ThriftFlumeEvent, sendbuff)
 	sourceServer := &SourceServer{
 		business:        business,
