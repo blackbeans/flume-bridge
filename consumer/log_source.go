@@ -119,7 +119,8 @@ func (self *SourceServer) start() {
 			sendbuff <- pack[:len(pack)]
 			// item = eventPool.Get()
 			// pack = item.([]*flume.ThriftFlumeEvent)
-			pack = make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
+			// pack = make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
+			pack = pack[:0]
 		}
 
 		close(sendbuff)
@@ -203,8 +204,8 @@ func decodeCommand(resp []byte) (string, *flume.ThriftFlumeEvent) {
 
 	//拼Body
 	flumeBody := fmt.Sprintf("%s\t%s\t%s", momoid, action, string(body))
-	// obj := objpool.Get()
-	obj := client.NewFlumeEvent()
+	obj := objpool.Get()
+	// obj := client.NewFlumeEvent()
 	event := client.EventFillUp(obj, businessName, action, []byte(flumeBody))
 	// event := client.NewFlumeEvent(businessName, action, []byte(flumeBody))
 	return businessName, event
