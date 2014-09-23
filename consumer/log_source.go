@@ -96,41 +96,42 @@ func (self *SourceServer) start() {
 			for !self.isStop {
 				events := <-ch
 				self.innerSend(events)
-				//归还当前的数组空间
-				// defer func() {
-				// 	eventPool.Put(events)
-				// }()
+				// 归还当前的数组空间
+				defer func() {
+					eventPool.Put(events)
+				}()
 			}
 		}(sendbuff)
 	}
 
 	go func() {
 		//批量收集数据
-		pack := make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
-		// item := eventPool.Get()
-		// pack := item.([]*flume.ThriftFlumeEvent)
-		// idx := 0
+		// pack := make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
+		item := eventPool.Get()
+		pack := item.([]*flume.ThriftFlumeEvent)
+		idx := 0
 		for !self.isStop {
 			event := <-self.buffChannel
 
-			if len(pack) < self.batchSize {
-				pack = append(pack, event)
-				continue
-			}
-			sendbuff <- pack[:len(pack)]
-			pack = make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
-
-			//如果总数大于batchsize则提交
-			// if idx < self.batchSize {
-			// 	//批量提交
-			// 	pack[idx] = event
-			// 	idx++
+			// if len(pack) < self.batchSize {
+			// 	pack = append(pack, event)
 			// 	continue
 			// }
+			// sendbuff <- pack[:len(pack)]
+			// pack = make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
 
-			// sendbuff <- pack[:idx]
-			// item = eventPool.Get()
-			// pack = item.([]*flume.ThriftFlumeEvent)
+			如果总数大于batchsize则提交
+			if idx < self.batchSize {
+				//批量提交
+				pack[idx] = event
+				idx++
+				continue
+			}
+
+			sendbuff <- pack[:idx]
+			item = eventPool.Get()
+			pack = item.([]*flume.ThriftFlumeEvent)
+			idx = 0
 
 		}
 
