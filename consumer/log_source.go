@@ -116,7 +116,6 @@ func (self *SourceServer) start() {
 			if len(pack) < self.batchSize {
 				pack = append(pack, event)
 			}
-
 			sendbuff <- pack[:len(pack)]
 			pack = make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
 
