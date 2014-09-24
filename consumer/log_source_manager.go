@@ -95,8 +95,8 @@ func buildLog(basepath, logname, filename string) stdlog.Logger {
 	logger.SetPrefix(func() string {
 		now := time.Now()
 		nt := now.Format("2006-01-02 15:04:05")
-		return nt
-	} + "\t")
+		return nt + "\t"
+	})
 	return logger
 }
 
