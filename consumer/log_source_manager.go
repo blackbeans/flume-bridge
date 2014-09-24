@@ -256,7 +256,7 @@ func (self *SourceManager) startWorker() {
 						//提交到对应business的channel中
 						sourceServer, ok := self.sourceServers[businessName]
 						if !ok {
-                            //use the default channel
+							//use the default channel
 							sourceServer, ok := self.sourceServers["default"]
 							if !ok && !sourceServer.isStop {
 								sourceServer.buffChannel <- event
@@ -264,11 +264,11 @@ func (self *SourceManager) startWorker() {
 								self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|DEFAULT SOURCE_SERVER NOT EXSIT OR STOPPED\n")
 							}
 						} else {
-                            if !sourceServer.isStop {
-							    sourceServer.buffChannel <- event
-                            } else {
-							    self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|SOURCE_SERVER STOPPED|%s\n", businessName)
-                            }
+							if !sourceServer.isStop {
+								sourceServer.buffChannel <- event
+							} else {
+								self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|SOURCE_SERVER STOPPED|%s\n", businessName)
+							}
 						}
 					}
 					self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|REDIS-POP|EXIT|%s|%s\n", queuename, self.instancename)
