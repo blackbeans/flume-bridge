@@ -11,7 +11,6 @@ import (
 	"github.com/momotech/GoRedis/libs/stdlog"
 	"log"
 	"math/rand"
-	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -27,26 +26,9 @@ type counter struct {
 }
 
 const (
-	batchSize = 1000
-	sendbuff  = 100000
+	batchSize = 500
+	sendbuff  = 10000
 )
-
-//生成对象池用于缓存 thriftEvent对象
-var objpool *sync.Pool
-var eventPool *sync.Pool
-
-func init() {
-	objpool = &sync.Pool{}
-	objpool.New = func() interface{} {
-		//创建生成thriftevent的
-		return client.NewFlumeEvent()
-	}
-
-	eventPool = &sync.Pool{}
-	eventPool.New = func() interface{} {
-		return make([]*flume.ThriftFlumeEvent, 0, batchSize)
-	}
-}
 
 // 用于向flume中作为sink 通过thrift客户端写入日志
 type SourceServer struct {
@@ -100,17 +82,15 @@ func (self *SourceServer) start() {
 	self.isStop = false
 
 	//创建chan ,buffer 为10
-	sendbuff := make(chan []*flume.ThriftFlumeEvent, 100)
+	sendbuff := make(chan []*flume.ThriftFlumeEvent, 50)
 	//启动20个go程从channel获取
 	for i := 0; i < 10; i++ {
 		go func(ch chan []*flume.ThriftFlumeEvent) {
 			for !self.isStop {
 				events := <-ch
 				self.innerSend(events)
-				defer func() {
-					//回收
-					self.chpool <- events[:0]
-				}()
+				//回收
+				self.chpool <- events[:0]
 
 			}
 		}(sendbuff)
@@ -119,13 +99,10 @@ func (self *SourceServer) start() {
 	go func() {
 		//批量收集数据
 		pack := <-self.chpool
-		// item := eventPool.Get()
-		// pack := item.([]*flume.ThriftFlumeEvent)
 		for !self.isStop {
-			event := <-self.buffChannel
 
 			if len(pack) < self.batchSize {
-				pack = append(pack, event)
+				pack = append(pack, <-self.buffChannel)
 				continue
 			}
 			sendbuff <- pack[:len(pack)]
@@ -134,9 +111,9 @@ func (self *SourceServer) start() {
 		}
 
 		close(sendbuff)
+		close(self.chpool)
 	}()
 
-	close(self.chpool)
 	self.sourceLog.Printf("LOG_SOURCE|SOURCE SERVER [%s]|STARTED\n", self.business)
 }
 
@@ -209,10 +186,8 @@ func decodeCommand(resp []byte) (string, *flume.ThriftFlumeEvent) {
 
 	//拼Body
 	flumeBody := fmt.Sprintf("%s\t%s\t%s", momoid, action, string(body))
-	obj := objpool.Get()
-	// obj := client.NewFlumeEvent()
+	obj := client.NewFlumeEvent()
 	event := client.EventFillUp(obj, businessName, action, []byte(flumeBody))
-	// event := client.NewFlumeEvent(businessName, action, []byte(flumeBody))
 	return businessName, event
 }
 
