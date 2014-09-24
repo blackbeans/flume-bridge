@@ -144,8 +144,9 @@ func (self *SourceServer) innerSend(events []*flume.ThriftFlumeEvent) {
 
 	for i := 0; i < 3; i++ {
 
-		pool := self.getFlumeClientPool()
+        pool := self.getFlumeClientPool()
 		if nil == pool {
+			self.sourceLog.Printf("LOG_SOURCE|GET FLUMECLIENTPOOL|FAIL|%s|TRY:%d\n", self.business, i)
 			continue
 		}
 		flumeclient, err := pool.Get(5 * time.Second)
