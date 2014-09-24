@@ -258,7 +258,7 @@ func (self *SourceManager) startWorker() {
 						if !ok {
 							//use the default channel
 							sourceServer, ok := self.sourceServers["default"]
-							if !ok && nil != sourceServer && !sourceServer.isStop {
+							if ok && nil != sourceServer && !sourceServer.isStop {
 								sourceServer.buffChannel <- event
 							} else {
 								self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|DEFAULT SOURCE_SERVER NOT EXSIT OR STOPPED\n")
