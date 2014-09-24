@@ -111,9 +111,9 @@ func (self *SourceServer) start() {
 		}
 
 		close(sendbuff)
+		close(self.chpool)
 	}()
 
-	close(self.chpool)
 	self.sourceLog.Printf("LOG_SOURCE|SOURCE SERVER [%s]|STARTED\n", self.business)
 }
 
