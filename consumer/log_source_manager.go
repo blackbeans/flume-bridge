@@ -96,7 +96,7 @@ func buildLog(basepath, logname, filename string) stdlog.Logger {
 		now := time.Now()
 		nt := now.Format("2006-01-02 15:04:05")
 		return nt
-	})
+	} + "\t")
 	return logger
 }
 
@@ -258,7 +258,7 @@ func (self *SourceManager) startWorker() {
 						if !ok {
 							//use the default channel
 							sourceServer, ok := self.sourceServers["default"]
-							if !ok && !sourceServer.isStop {
+							if !ok && nil != sourceServer && !sourceServer.isStop {
 								sourceServer.buffChannel <- event
 							} else {
 								self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|DEFAULT SOURCE_SERVER NOT EXSIT OR STOPPED\n")
