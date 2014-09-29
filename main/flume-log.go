@@ -69,7 +69,7 @@ func main() {
 		} else if cmd == syscall.SIGUSR1 {
 			//如果为siguser1则进行dump内存
 			unixtime := time.Now().Unix()
-			path := *baseLog + "/heapdump-" + fmt.Sprintf("%d", unixtime)
+			path := *baseLog + "/" + *instancename + "/heapdump-" + *instancename + fmt.Sprintf("%d", unixtime)
 			f, err := os.Create(path)
 			if nil != err {
 				log.Println("FLUME_LOG|ERROR|DUMP HEAP|" + err.Error())

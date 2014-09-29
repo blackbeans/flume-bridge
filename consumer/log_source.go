@@ -109,9 +109,7 @@ func (self *SourceServer) start() {
 			//从池子中获取一个slice
 			pack = <-self.chpool
 		}
-
 		close(sendbuff)
-		close(self.chpool)
 	}()
 
 	self.sourceLog.Printf("LOG_SOURCE|SOURCE SERVER [%s]|STARTED\n", self.business)
@@ -200,6 +198,7 @@ func (self *SourceServer) stop() {
 		v.Value.(*pool.FlumePoolLink).DetachBusiness(self.business)
 	}
 	close(self.buffChannel)
+	close(self.chpool)
 	self.sourceLog.Printf("LOG_SOURCE|SOURCE SERVER|[%s]|STOPPED\n", self.business)
 }
 
