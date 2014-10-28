@@ -331,13 +331,14 @@ func (self *FlumeClientPool) Destroy() {
 	self.mutex.Lock()
 	self.running = false
 	self.mutex.Unlock()
-	for {
+	for i := 0; i < 3; {
 		time.Sleep(5 * time.Second)
 		if self.ActivePoolSize() <= 0 {
 
 			break
 		}
 		log.Printf("flume client pool closing : activepool:%d\n", self.ActivePoolSize())
+		i++
 	}
 
 	//关闭掉空闲的client
