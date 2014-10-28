@@ -197,8 +197,8 @@ func (self *SourceServer) stop() {
 	for v := self.flumeClientPool.Back(); nil != v; v = v.Prev() {
 		v.Value.(*pool.FlumePoolLink).DetachBusiness(self.business)
 	}
-	close(self.buffChannel)
-	close(self.chpool)
+	//close(self.buffChannel)
+	//close(self.chpool)
 	self.sourceLog.Printf("LOG_SOURCE|SOURCE SERVER|[%s]|STOPPED\n", self.business)
 }
 
