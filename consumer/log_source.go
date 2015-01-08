@@ -99,12 +99,13 @@ func (self *SourceServer) start() {
 	go func() {
 		//批量收集数据
 		pack := <-self.chpool
+		lastCheckTime := time.Now().Unix()
 		for !self.isStop {
-
-			if len(pack) < self.batchSize {
+			if len(pack) < self.batchSize && time.Now().Unix()-lastCheckTime <= 0 {
 				pack = append(pack, <-self.buffChannel)
 				continue
 			}
+			lastCheckTime = time.Now().Unix()
 			sendbuff <- pack[:len(pack)]
 			//从池子中获取一个slice
 			pack = <-self.chpool
