@@ -16,7 +16,7 @@ type FlumePoolLink struct {
 
 	BusinessLink *list.List //使用这个clientpool的业务名称
 
-	Mutex sync.Mutex //保证在并发情况下能够对list的操作安全
+	Mutex sync.RWMutex //保证在并发情况下能够对list的操作安全
 }
 
 func NewFlumePoolLink(hp config.HostPort) (error, *FlumePoolLink) {
@@ -30,8 +30,8 @@ func NewFlumePoolLink(hp config.HostPort) (error, *FlumePoolLink) {
 }
 
 func (self *FlumePoolLink) IsAttached(business string) bool {
-	self.Mutex.Lock()
-	defer self.Mutex.Unlock()
+	self.Mutex.RLock()
+	defer self.Mutex.RUnlock()
 	return self.exists(business)
 
 }
@@ -48,21 +48,22 @@ func (self *FlumePoolLink) exists(business string) bool {
 //将该business从link加入
 func (self *FlumePoolLink) AttachBusiness(business string) {
 	self.Mutex.Lock()
+	defer self.Mutex.Unlock()
 	if !self.exists(business) {
 		self.BusinessLink.PushFront(business)
 	}
-	defer self.Mutex.Unlock()
 }
 
 //将该business从link重移除
 func (self *FlumePoolLink) DetachBusiness(business string) {
 	self.Mutex.Lock()
+	defer self.Mutex.Unlock()
 	for e := self.BusinessLink.Back(); nil != e; e = e.Prev() {
 		if e.Value.(string) == business {
 			self.BusinessLink.Remove(e)
 		}
 	}
-	self.Mutex.Unlock()
+
 }
 
 //flume连接池
@@ -71,7 +72,8 @@ type FlumeClientPool struct {
 	maxPoolSize  int //最大尺子大小
 	minPoolSize  int //最小连接池大小
 	corepoolSize int //核心池子大小
-	// activePoolSize int //当前正在运行的client
+
+	poolSize int //当前正在运行的client
 
 	idletime time.Duration //空闲时间
 
@@ -79,7 +81,7 @@ type FlumeClientPool struct {
 
 	checkOutPool *list.List //已经获取的poolsize
 
-	mutex sync.Mutex
+	mutex sync.RWMutex
 
 	hostport config.HostPort
 
@@ -101,6 +103,7 @@ func newFlumeClientPool(hostport config.HostPort, minPoolSize, corepoolSize,
 		maxPoolSize:  maxPoolSize,
 		corepoolSize: corepoolSize,
 		minPoolSize:  minPoolSize,
+		poolSize:     0,
 		idletime:     idletime,
 		idlePool:     idlePool,
 		dialFunc:     dialFunc,
@@ -130,9 +133,46 @@ func newFlumeClientPool(hostport config.HostPort, minPoolSize, corepoolSize,
 
 		idleClient := &IdleClient{flumeclient: flumeclient, expiredTime: (time.Now().Add(clientpool.idletime))}
 		clientpool.idlePool.PushFront(idleClient)
-		// clientpool.activePoolSize++
+		clientpool.poolSize++
 	}
+	//启动链接过期
+	go clientpool.evict()
 	return nil, clientpool
+}
+
+func (self *FlumeClientPool) evict() {
+	for self.running {
+
+		select {
+		case <-time.After(self.idletime):
+			self.mutex.Lock()
+			//池子中没有请求的时候做一下连接清理
+			if self.checkOutPool.Len() <= 0 {
+				continue
+			}
+
+			for e := self.idlePool.Back(); nil != e; e = e.Prev() {
+				idleclient := e.Value.(*IdleClient)
+				//如果当前时间在过期时间之后并且活动的链接大于corepoolsize则关闭
+				isExpired := idleclient.expiredTime.Before(time.Now())
+				if isExpired &&
+					self.poolSize >= self.corepoolSize {
+					idleclient.flumeclient.Destroy()
+					idleclient = nil
+					self.idlePool.Remove(e)
+					//并且该表当前的active数量
+					self.poolSize--
+				} else if isExpired {
+					//过期的但是已经不够corepoolsize了直接重新设置过期时间
+					idleclient.expiredTime = time.Now().Add(self.idletime)
+				} else {
+					//活动的数量小于corepool的则修改存活时间
+					idleclient.expiredTime = time.Now().Add(self.idletime)
+				}
+			}
+			self.mutex.Unlock()
+		}
+	}
 }
 
 func (self *FlumeClientPool) GetHostPort() config.HostPort {
@@ -140,7 +180,7 @@ func (self *FlumeClientPool) GetHostPort() config.HostPort {
 }
 
 func (self *FlumeClientPool) MonitorPool() (int, int, int) {
-	return self.ActivePoolSize(), self.CorePoolSize(), self.maxPoolSize
+	return self.checkOutPool.Len(), self.poolSize, self.maxPoolSize
 
 }
 func (self *FlumeClientPool) Get(timeout time.Duration) (*client.FlumeClient, error) {
@@ -158,33 +198,27 @@ func (self *FlumeClientPool) Get(timeout time.Duration) (*client.FlumeClient, er
 		clientch <- fclient
 	}()
 
-	ch := make(chan bool, 1)
-	defer close(ch)
 	select {
 	case fclient = <-clientch:
-		ch <- false
-		break
-	case <-time.After(time.Second * timeout):
-		ch <- true
-		break
+		return fclient, nil
+	case <-time.After(timeout):
+		return nil, errors.New("get client timeout!")
+
 	}
 
-	isTimeout := <-ch
-	//如果超时直接返回
-	if isTimeout {
-		return fclient, errors.New("get client timeout!")
-	} else {
-		return fclient, nil
-	}
 }
 
-//返回当前的corepoolszie
-func (self *FlumeClientPool) CorePoolSize() int {
-	return self.idlePool.Len() + self.checkOutPool.Len()
+//返回当前的poolszie
+func (self *FlumeClientPool) PoolSize() int {
+	self.mutex.RLock()
+	defer self.mutex.RUnlock()
+	return self.poolSize
 
 }
 
 func (self *FlumeClientPool) ActivePoolSize() int {
+	self.mutex.RLock()
+	defer self.mutex.RUnlock()
 	return self.checkOutPool.Len()
 }
 
@@ -194,7 +228,6 @@ func (self *FlumeClientPool) ReleaseBroken(fclient *client.FlumeClient) error {
 	defer self.mutex.Unlock()
 	_, err := self.innerRelease(fclient)
 	return err
-
 }
 
 func (self *FlumeClientPool) innerRelease(fclient *client.FlumeClient) (bool, error) {
@@ -202,6 +235,12 @@ func (self *FlumeClientPool) innerRelease(fclient *client.FlumeClient) (bool, er
 		checkClient := e.Value.(*client.FlumeClient)
 		if fclient == checkClient {
 			self.checkOutPool.Remove(e)
+			if fclient.IsAlive() {
+				idleClient := &IdleClient{flumeclient: fclient, expiredTime: (time.Now().Add(self.idletime))}
+				self.idlePool.PushFront(idleClient)
+			} else {
+				self.poolSize--
+			}
 			// log.Println("client return pool ")
 			return true, nil
 		}
@@ -216,32 +255,11 @@ func (self *FlumeClientPool) innerRelease(fclient *client.FlumeClient) (bool, er
 * 归还当前的连接
 **/
 func (self *FlumeClientPool) Release(fclient *client.FlumeClient) error {
-
-	idleClient := &IdleClient{flumeclient: fclient, expiredTime: (time.Now().Add(self.idletime))}
 	self.mutex.Lock()
 	defer self.mutex.Unlock()
-
 	//从checkoutpool中移除
-	succ, err := self.innerRelease(fclient)
-	if nil != err {
-		return err
-	}
-
-	//如果当前的corepoolsize 是大于等于设置的corepoolssize的则直接销毁这个client
-	if self.CorePoolSize() >= self.corepoolSize {
-
-		idleClient.flumeclient.Destroy()
-		fclient = nil
-
-		//并且从idle
-	} else if succ {
-		self.idlePool.PushFront(idleClient)
-	} else {
-		fclient.Destroy()
-		fclient = nil
-	}
-
-	return nil
+	_, err := self.innerRelease(fclient)
+	return err
 
 }
 
@@ -249,37 +267,7 @@ func (self *FlumeClientPool) Release(fclient *client.FlumeClient) error {
 func (self *FlumeClientPool) innerGet() *client.FlumeClient {
 
 	var fclient *client.FlumeClient
-	//首先检查一下当前空闲连接中是否有需要关闭的
-	self.mutex.Lock()
-	defer self.mutex.Unlock()
-	for back := self.idlePool.Back(); back != nil; back = back.Prev() {
-		// push ---> front ----> back 最旧的client
-		idle := (back.Value).(*IdleClient)
-
-		//如果已经挂掉直接移除
-		if !idle.flumeclient.IsAlive() {
-			self.idlePool.Remove(back)
-			idle.flumeclient.Destroy()
-			continue
-		}
-
-		//只有在corepoolsize>最小的池子大小，才去检查过期连接
-		if self.CorePoolSize() > self.minPoolSize {
-			//如果过期时间实在当前时间之后那么后面的都不过期
-			if idle.expiredTime.After(time.Now()) {
-				//判断一下当前连接的状态是否为alive 否则直接销毁
-				self.idlePool.Remove(back)
-				idle.flumeclient.Destroy()
-			}
-		} else {
-			//如果小于等于Minpoolsize时，如果过期就将时间重置
-
-			if idle.expiredTime.After(time.Now()) {
-				idle.expiredTime = time.Now().Add(self.idletime)
-			}
-		}
-	}
-
+	self.mutex.RLock()
 	//优先从空闲链接中获取链接
 	for i := 0; i < self.idlePool.Len(); i++ {
 		back := self.idlePool.Back()
@@ -289,41 +277,31 @@ func (self *FlumeClientPool) innerGet() *client.FlumeClient {
 		self.idlePool.Remove(back)
 		break
 	}
+	self.mutex.RUnlock()
 
 	//如果client还是没有那么久创建链接
 	if nil == fclient {
 		//工作连接数和空闲连接数已经达到最大的连接数上限
-		if self.CorePoolSize() >= self.maxPoolSize {
-			log.Printf("FLUME_POOL_FULL|minPoolSize:%d,maxPoolSize:%d,corePoolSize:%d,activePoolSize:%d\n ",
-				self.minPoolSize, self.maxPoolSize, self.CorePoolSize(), self.ActivePoolSize())
+		if self.poolSize >= self.maxPoolSize {
+			log.Printf("FlumeClientPool|innerGet|FULL|minPoolSize:%d,maxPoolSize:%d,poolSize:%d,activePoolSize:%d\n ",
+				self.minPoolSize, self.maxPoolSize, self.checkOutPool.Len())
 			return fclient
 		} else {
+
 			//如果没有可用链接则创建一个
 			err, newClient := self.dialFunc()
 			if nil != err {
-
+				log.Printf("FlumeClientPool|innerGet|dialFunc|FAIL|%s\n", err)
 			} else {
+				self.mutex.Lock()
+				defer self.mutex.Unlock()
 				self.checkOutPool.PushFront(newClient)
 				fclient = newClient
+				self.poolSize++
 			}
+
 		}
 	}
-
-	//检查是否corepool>= minpool,否则就创建连接
-	if self.CorePoolSize() < self.minPoolSize {
-		for i := self.CorePoolSize(); i <= self.minPoolSize; i++ {
-			//如果没有可用链接则创建一个
-			err, fclient := self.dialFunc()
-			if nil != err {
-				log.Printf("POOL|corepool(%d) < minpool(%d)|CREATE CLIENT FAIL|%s",
-					self.CorePoolSize(), self.minPoolSize, err.Error())
-			} else {
-				idleClient := &IdleClient{flumeclient: fclient, expiredTime: (time.Now().Add(self.idletime))}
-				self.idlePool.PushFront(idleClient)
-			}
-		}
-	}
-
 	return fclient
 }
 
@@ -334,13 +312,14 @@ func (self *FlumeClientPool) Destroy() {
 	for i := 0; i < 3; {
 		time.Sleep(5 * time.Second)
 		if self.ActivePoolSize() <= 0 {
-
 			break
 		}
 		log.Printf("flume client pool closing : activepool:%d\n", self.ActivePoolSize())
 		i++
 	}
 
+	self.mutex.Lock()
+	defer self.mutex.Unlock()
 	//关闭掉空闲的client
 	for e := self.idlePool.Front(); e != nil; e = e.Next() {
 		fclient := e.Value.(*IdleClient)

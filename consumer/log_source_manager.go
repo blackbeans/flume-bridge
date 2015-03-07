@@ -1,7 +1,6 @@
 package consumer
 
 import (
-	"container/list"
 	"flume-log-sdk/config"
 	"flume-log-sdk/consumer/pool"
 	"github.com/blackbeans/redigo/redis"
@@ -137,7 +136,8 @@ func (self *SourceManager) initSourceServers(businesses []string, zkmanager *con
 		nodewatcher := newFlumeWatcher(business, self)
 		flumeNode := zkmanager.GetAndWatch(business, nodewatcher)
 		self.watcherPool[business] = nodewatcher
-		self.initSourceServer(business, flumeNode)
+		sserver := self.initSourceServer(business, flumeNode)
+		self.sourceServers[business] = sserver
 	}
 
 	//-------------------注册当前进程ID到zk
@@ -163,7 +163,7 @@ func (self *SourceManager) initSourceServer(business string, flumenodes []config
 
 	//新增的消费类型
 	//使用的pool
-	pools := list.New()
+	pools := make([]*pool.FlumePoolLink, 0, 10)
 	for _, hp := range flumenodes {
 		poollink, ok := self.hp2flumeClientPool[hp]
 		if !ok {
@@ -191,12 +191,11 @@ func (self *SourceManager) initSourceServer(business string, flumenodes []config
 		}
 
 		poollink.AttachBusiness(business)
-		pools.PushFront(poollink)
+		pools = append(pools, poollink)
 	}
 
 	//创建一个sourceserver
 	sourceserver := newSourceServer(business, pools, self.flumeSourceLog)
-	self.sourceServers[business] = sourceserver
 	return sourceserver
 
 }
@@ -235,7 +234,6 @@ func (self *SourceManager) startWorker() {
 							} else {
 								time.Sleep(100 * time.Millisecond)
 							}
-
 							continue
 						}
 

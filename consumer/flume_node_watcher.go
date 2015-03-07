@@ -25,8 +25,8 @@ func (self *FlumeWatcher) BusinessWatcher(business string, eventType config.ZkEv
 			//关闭这个业务消费
 			val.stop()
 			delete(self.sourcemanger.sourceServers, business)
-			for e := val.flumeClientPool.Back(); nil != e; e = e.Prev() {
-				self.clearPool(business, e.Value.(*pool.FlumePoolLink))
+			for _, p := range val.clientPools {
+				self.clearPool(business, p)
 			}
 			self.sourcemanger.watcherLog.Printf("business:[%s] deleted\n", business)
 		} else {
@@ -38,6 +38,7 @@ func (self *FlumeWatcher) BusinessWatcher(business string, eventType config.ZkEv
 //清理掉pool
 func (self *FlumeWatcher) clearPool(business string, pool *pool.FlumePoolLink) {
 	pool.Mutex.Lock()
+	defer pool.Mutex.Unlock()
 	if pool.BusinessLink.Len() == 0 {
 		//如果已经没有使用的业务了直接关掉该pool
 		pool.FlumePool.Destroy()
@@ -45,8 +46,7 @@ func (self *FlumeWatcher) clearPool(business string, pool *pool.FlumePoolLink) {
 		delete(self.sourcemanger.hp2flumeClientPool, pool.FlumePool.GetHostPort())
 		self.sourcemanger.watcherLog.Printf("WATCHER|REMOVE FLUME:%s\n", hp)
 	}
-	pool.Mutex.Unlock()
-	pool = nil
+
 }
 
 func (self *FlumeWatcher) ChildWatcher(business string, childNode []config.HostPort) {
@@ -60,62 +60,13 @@ func (self *FlumeWatcher) ChildWatcher(business string, childNode []config.HostP
 	self.sourcemanger.mutex.Lock()
 	defer self.sourcemanger.mutex.Unlock()
 	val, ok := self.sourcemanger.sourceServers[business]
+
+	sourceserver := self.sourcemanger.initSourceServer(business, childNode)
+	sourceserver.start()
+
+	//存在的话就直接stop再重新创建一个
 	if ok {
-		//判断该业务下已经被停掉的节点
-		// for _, link := range val.flumeClientPool {
-		for e := val.flumeClientPool.Back(); nil != e; e = e.Prev() {
-			link := e.Value.(*pool.FlumePoolLink)
-			hp := link.FlumePool.GetHostPort()
-			contain := false
-			for _, chp := range childNode {
-				//如果当前节点没有变更，即存在在childnode中不变更
-				if hp == chp {
-					contain = true
-				}
-			}
-
-			//如果当前的node没有在childnode中则删除该pooL
-			if !contain {
-				size := val.flumeClientPool.Len()
-				link.DetachBusiness(business)
-				val.flumeClientPool.Remove(e)
-				self.clearPool(business, link)
-				//从Business的clientpool中移除该client
-				self.sourcemanger.watcherLog.Printf("WATCHER|BUSINESS:%s|REMOVE FLUME:%s|SIZE:[%d,%d]\n",
-					business, hp, size, val.flumeClientPool.Len())
-			}
-		}
-
-		//已经存在那么就检查节点变更
-		for _, hp := range childNode {
-			//先创建该业务节点：
-			fpool, ok := self.sourcemanger.hp2flumeClientPool[hp]
-			//如果存在Pool直接使用
-			if ok {
-				//检查该业务已有是否已经该flumepool
-				//如果不包含则创建该池子并加入该业务对应的flumeclientpoollink中
-				if !fpool.IsAttached(business) {
-					val.flumeClientPool.PushFront(fpool)
-					fpool.AttachBusiness(business)
-					self.sourcemanger.watcherLog.Printf("WATCHER|BUSINESS:[%s]|ADD POOL|[%s]\n", business, hp)
-				}
-				//如果已经包含了，则啥事都不干
-
-			} else {
-				//如果不存在该flumepool，直接创建并且添加到该pool种
-				err, poollink := pool.NewFlumePoolLink(hp)
-				if nil == err || nil != poollink {
-					self.sourcemanger.hp2flumeClientPool[hp] = poollink
-					val.flumeClientPool.PushFront(poollink)
-					poollink.AttachBusiness(business)
-				} else if nil != err {
-					self.sourcemanger.watcherLog.Printf("WATCHER|BUSINESS:[%s]|ADD POOL|FAIL|[%s]|%s\n", business, hp, err.Error())
-				}
-			}
-		}
-
-	} else {
-		sourceserver := self.sourcemanger.initSourceServer(business, childNode)
-		sourceserver.start()
+		val.stop()
 	}
+	self.sourcemanger.sourceServers[business] = sourceserver
 }
