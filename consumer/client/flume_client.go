@@ -114,21 +114,21 @@ func (self *FlumeClient) innerSend(sendfunc func() (flume.Status, error)) error 
 		//重新建立thriftclient
 		err := self.clientConn()
 		if nil != err {
-			log.Printf("FLUME_CLIENT|SEND EVENT|CLIENT CONN | CREATE FAIL|%s\n", err.Error())
+			log.Printf("FLUME_CLIENT|SEND EVENT|CLIENT CONN|CREATE FAIL|%s|%s\n", self.HostPort(), err.Error())
 			return err
 		}
 	}
 
 	status, err := sendfunc()
 	if nil != err {
-		log.Printf("FLUME_CLIENT|SEND EVENT|FAIL|%s|STATUS:%s\n", err.Error(), status)
+		log.Printf("FLUME_CLIENT|SEND EVENT|FAIL|%s|%s|STATUS:%s\n", self.HostPort(), err.Error(), status)
 		status = flume.Status_ERROR
 		self.status = STATUS_DEAD
 	}
 
 	//如果没有成功则向上抛出
 	if status != flume.Status_OK {
-		return errors.New("deliver fail ! " + status.String())
+		return errors.New("deliver fail ! " + self.HostPort() + "|" + status.String())
 	}
 	return nil
 }
