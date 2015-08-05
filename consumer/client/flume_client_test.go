@@ -1,10 +1,9 @@
 package client
 
 import (
-	"testing"
-
 	"encoding/json"
-	"flume-log-sdk/rpc/flume"
+	"flume-bridge/rpc/flume"
+	"testing"
 )
 
 func TestFlumeClient(t *testing.T) {

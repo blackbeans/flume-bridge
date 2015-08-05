@@ -2,9 +2,9 @@ package consumer
 
 import (
 	"encoding/json"
-	"flume-log-sdk/config"
-	"flume-log-sdk/consumer/client"
-	"flume-log-sdk/rpc/flume"
+	"flume-bridge/config"
+	"flume-bridge/consumer/client"
+	"flume-bridge/rpc/flume"
 	"fmt"
 	"log"
 )

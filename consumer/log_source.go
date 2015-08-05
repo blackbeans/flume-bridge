@@ -1,8 +1,8 @@
 package consumer
 
 import (
-	"flume-log-sdk/consumer/pool"
-	"flume-log-sdk/rpc/flume"
+	"flume-bridge/consumer/pool"
+	"flume-bridge/rpc/flume"
 	"github.com/momotech/GoRedis/libs/stdlog"
 	"math/rand"
 	"net"

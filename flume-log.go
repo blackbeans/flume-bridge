@@ -2,8 +2,8 @@ package main
 
 import (
 	"flag"
-	"flume-log-sdk/config"
-	"flume-log-sdk/consumer"
+	"flume-bridge/config"
+	"flume-bridge/consumer"
 	"fmt"
 	"log"
 	"net/http"

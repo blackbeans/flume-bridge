@@ -2,8 +2,8 @@ package consumer
 
 import (
 	"container/list"
-	"flume-log-sdk/config"
-	"flume-log-sdk/consumer/pool"
+	"flume-bridge/config"
+	"flume-bridge/consumer/pool"
 	"testing"
 	"time"
 )

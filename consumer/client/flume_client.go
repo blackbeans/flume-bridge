@@ -2,7 +2,7 @@ package client
 
 import (
 	"errors"
-	"flume-log-sdk/rpc/flume"
+	"flume-bridge/rpc/flume"
 	"fmt"
 	"git.apache.org/thrift.git/lib/go/thrift"
 	"log"

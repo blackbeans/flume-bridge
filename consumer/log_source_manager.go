@@ -1,8 +1,8 @@
 package consumer
 
 import (
-	"flume-log-sdk/config"
-	"flume-log-sdk/consumer/pool"
+	"flume-bridge/config"
+	"flume-bridge/consumer/pool"
 	"github.com/blackbeans/redigo/redis"
 	"github.com/momotech/GoRedis/libs/stdlog"
 	"log"

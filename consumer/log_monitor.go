@@ -1,7 +1,7 @@
 package consumer
 
 import (
-	"flume-log-sdk/config"
+	"flume-bridge/config"
 	"fmt"
 	"sort"
 	"strconv"
