@@ -1,4 +1,9 @@
 #!/bin/bash
+
+go get git.apache.org/thrift.git/lib/go/thrift
+go get github.com/blackbeans/redigo/redis
+go get github.com/momotech/GoRedis/libs/stdlog
+
 go build flume-bridge/consumer/client
 go build flume-bridge/config 
 
