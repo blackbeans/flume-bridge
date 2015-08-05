@@ -5,6 +5,8 @@ import (
 	"flume-log-sdk/rpc/flume"
 	"github.com/momotech/GoRedis/libs/stdlog"
 	"math/rand"
+	"net"
+	"strings"
 	"sync/atomic"
 	"time"
 )
@@ -33,6 +35,28 @@ type SourceServer struct {
 	buffChannel  chan *flume.ThriftFlumeEvent
 	sourceLog    stdlog.Logger
 	sendWorkNum  chan byte //发送线程数
+}
+
+var LOCAL_IP = []string{}
+
+func init() {
+	interfaces, err := net.Interfaces()
+	if nil == err {
+		for _, inter := range interfaces {
+			if inter.Name == "bond0" {
+				//如果是当前网卡则选择
+				addrs, _ := inter.Addrs()
+				for _, addr := range addrs {
+					if strings.Index(addr.String(), "10.83") == 0 ||
+						strings.Index(addr.String(), "172.30") == 0 {
+						ip := strings.Split(addr.String(), "/")[0]
+						LOCAL_IP = append(LOCAL_IP, ip)
+					}
+				}
+				break
+			}
+		}
+	}
 }
 
 func newSourceServer(business string, clientPools []*pool.FlumePoolLink, sourceLog stdlog.Logger) (server *SourceServer) {
@@ -158,9 +182,31 @@ func (self *SourceServer) stop() {
 }
 
 func (self *SourceServer) getFlumeClientPool() *pool.FlumeClientPool {
-	idx := rand.Intn(len(self.clientPools))
-	if idx < len(self.clientPools) {
-		return self.clientPools[idx].FlumePool
+
+	local := make([]*pool.FlumeClientPool, 0, 5)
+	remote := make([]*pool.FlumeClientPool, 0, 5)
+
+	//首先筛选当前本地flume agent机器IP
+	for _, cp := range self.clientPools {
+		for _, ip := range LOCAL_IP {
+			//如果是本机的则加入
+			if ip == cp.FlumePool.GetHostPort().Host {
+				local = append(local, cp.FlumePool)
+			} else {
+				remote = append(remote, cp.FlumePool)
+			}
+		}
 	}
+
+	//优先通过本地的flume-agent传输
+	if len(local) > 0 {
+		idx := rand.Intn(len(local))
+		return local[idx]
+	} else if len(remote) > 0 {
+		//再通过远端的方式传送数据
+		idx := rand.Intn(len(remote))
+		return remote[idx]
+	}
+
 	return nil
 }
