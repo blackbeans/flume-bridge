@@ -35,11 +35,16 @@ type Option struct {
 
 	QueueHostPorts []QueueHostPort //redis队列Pop
 
+	IsCompress bool //是否对数据进行压缩
+
 }
 
-func NewOption(logPath string, businesses []string, zkhosts string, hostPorts []QueueHostPort) *Option {
-
-	return &Option{LogPath: logPath, Businesses: businesses, Zkhost: zkhosts, QueueHostPorts: hostPorts}
+func NewOption(logPath string, businesses []string, zkhosts string, hostPorts []QueueHostPort, isCompress bool) *Option {
+	return &Option{LogPath: logPath,
+		Businesses:     businesses,
+		Zkhost:         zkhosts,
+		QueueHostPorts: hostPorts,
+		IsCompress:     isCompress}
 }
 
 //command

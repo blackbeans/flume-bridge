@@ -31,6 +31,7 @@ func main() {
 	zkhost := flag.String("zkhost", "momo-zk-001.m6:2210,momo-zk-002.m6:2210,momo-zk-003.m6:2210", "zkhost")
 	business := flag.String("businesses", "location", " businesses")
 	pprofPort := flag.Int("pport", -1, "pprof port default value is -1 ")
+	isCompress := flag.Bool("iscompress", false, "is compress")
 	flag.Parse()
 
 	go func() {
@@ -51,7 +52,7 @@ func main() {
 	}
 
 	businessArr := strings.Split(*business, ",")
-	option := config.NewOption(*baseLog, businessArr, *zkhost, queueHosts)
+	option := config.NewOption(*baseLog, businessArr, *zkhost, queueHosts, *isCompress)
 	sourcemanager := consumer.NewSourceManager(*instancename, option)
 
 	sourcemanager.Start()

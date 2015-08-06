@@ -141,7 +141,8 @@ func (self *SourceServer) flush(events []*flume.ThriftFlumeEvent) {
 		}
 		flumeclient, err := pool.Get(5 * time.Second)
 		if nil != err || nil == flumeclient {
-			self.sourceLog.Printf("LOG_SOURCE|GET FLUMECLIENT|FAIL|%s|%s|TRY:%d\n", self.business, err, i)
+			self.sourceLog.Printf("LOG_SOURCE|GET FLUMECLIENT|FAIL|%s|%s|TRY:%d\n",
+				self.business, err.Error(), i)
 			continue
 		}
 
@@ -157,7 +158,8 @@ func (self *SourceServer) flush(events []*flume.ThriftFlumeEvent) {
 
 		if nil != err {
 			atomic.AddInt64(&self.monitorCount.currFailValue, int64(len(events)))
-			self.sourceLog.Printf("LOG_SOURCE|SEND FLUME|FAIL|%s|%s|TRY:%d\n", self.business, err.Error(), i)
+			self.sourceLog.Printf("LOG_SOURCE|SEND FLUME|FAIL|%s|%s|%s|TRY:%d\n",
+				self.business, flumeclient.HostPort(), err.Error(), i)
 
 		} else {
 			atomic.AddInt64(&self.monitorCount.currSuccValue, int64(1*self.batchSize))

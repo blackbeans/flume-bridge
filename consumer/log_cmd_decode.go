@@ -1,13 +1,29 @@
 package consumer
 
 import (
+	"bytes"
+	"compress/flate"
 	"encoding/json"
 	"flume-bridge/config"
 	"flume-bridge/consumer/client"
 	"flume-bridge/rpc/flume"
 	"fmt"
+	"io/ioutil"
 	"log"
 )
+
+func decompress(data []byte) []byte {
+	//log.Printf("decompress|INPUT|%T\n", data)
+	r := flate.NewReader(bytes.NewBuffer(data))
+	defer r.Close()
+	ret, err := ioutil.ReadAll(r)
+	if err != nil {
+		log.Printf("command decompress fail ! | error:%s\n", err.Error())
+		return nil
+	}
+	//log.Printf("decompress|OUTPUT|%s\n", string(ret))
+	return ret
+}
 
 //解析出decodecommand
 func decodeCommand(resp []byte) (string, *flume.ThriftFlumeEvent) {

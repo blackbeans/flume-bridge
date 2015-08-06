@@ -45,11 +45,13 @@ type SourceManager struct {
 	flumePoolLog     stdlog.Logger
 	flumeSourceLog   stdlog.Logger
 	sourceManagerLog stdlog.Logger
+	option           *config.Option
 }
 
 func NewSourceManager(instancename string, option *config.Option) *SourceManager {
 
 	sourcemanager := &SourceManager{}
+	sourcemanager.option = option
 	sourcemanager.sourceServers = make(map[string]*SourceServer)
 	sourcemanager.hp2flumeClientPool = make(map[config.HostPort]*pool.FlumePoolLink)
 	sourcemanager.watcherPool = make(map[string]*config.Watcher)
@@ -242,6 +244,14 @@ func (self *SourceManager) startWorker() {
 						pool.currValue++
 
 						resp := reply.([]byte)
+
+						if self.option.IsCompress {
+							resp = decompress(resp)
+						}
+						if resp == nil {
+							continue
+						}
+
 						businessName, event := decodeCommand(resp)
 						if nil == event {
 							continue
