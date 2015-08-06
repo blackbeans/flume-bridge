@@ -3,7 +3,7 @@ package consumer
 import (
 	"flume-bridge/config"
 	"flume-bridge/consumer/pool"
-	"github.com/blackbeans/redigo/redis"
+	"github.com/garyburd/redigo/redis"
 	"github.com/momotech/GoRedis/libs/stdlog"
 	"log"
 	"os"
@@ -113,7 +113,7 @@ func initRedisQueue(option *config.Option) map[string][]*poolwrapper {
 				time.Duration(v.Timeout)*time.Second)
 
 			return
-		}, time.Duration(v.Timeout*2)*time.Second, v.Maxconn/2, v.Maxconn)
+		}, v.Maxconn/2)
 
 		pools, ok := redispool[v.QueueName]
 		if !ok {
@@ -222,7 +222,8 @@ func (self *SourceManager) startWorker() {
 				go func(queuename string, pool *poolwrapper) {
 					//批量收集数据
 					conn := pool.rpool.Get()
-					defer pool.rpool.Release(conn)
+					defer conn.Close()
+					// defer pool.rpool.Release(conn)
 					for self.isRunning {
 
 						reply, err := conn.Do("LPOP", queuename)
