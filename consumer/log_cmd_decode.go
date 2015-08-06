@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"strconv"
 )
 
 func decompress(data []byte) []byte {
@@ -26,35 +27,71 @@ func decompress(data []byte) []byte {
 }
 
 //解析出decodecommand
-func decodeCommand(resp []byte) (string, *flume.ThriftFlumeEvent) {
+func decodeCommand(resp []byte) (string, string, *flume.ThriftFlumeEvent) {
 	var cmd config.Command
 	err := json.Unmarshal(resp, &cmd)
 	if nil != err {
 		log.Printf("command unmarshal fail ! %T | error:%s\n", resp, err.Error())
-		return "", nil
+		return "", "", nil
 	}
-	//
-	momoid := cmd.Params["momoid"].(string)
 
-	businessName := cmd.Params["businessName"].(string)
+	if cmd.Params["momoid"] == nil {
+		log.Printf("command momoid is nil %T\n", resp)
+		return "", "", nil
+	}
 
-	action := cmd.Params["type"].(string)
+	momoid, ok := cmd.Params["momoid"].(string)
+	if !ok {
+		log.Printf("command format error. (momoid should be string type) %T\n", resp)
+		return "", "", nil
+	}
+
+	if cmd.Params["businessName"] == nil {
+		log.Printf("command format error. (businessName is nil) %T\n", resp)
+		return "", "", nil
+	}
+	businessName, ok := cmd.Params["businessName"].(string)
+	if !ok {
+		log.Printf("command format error. (businessName should be string type) %T\n", resp)
+		return "", "", nil
+	}
+
+	if cmd.Params["type"] == nil {
+		log.Printf("command format error. (type is nil) %T\n", resp)
+		return "", "", nil
+	}
+
+	action, ok := cmd.Params["type"].(string)
+	if !ok {
+		log.Printf("command format error. (type should be string type) %T\n", resp)
+		return "", "", nil
+	}
 
 	bodyContent := cmd.Params["body"]
+	bodyMap := bodyContent.(map[string]interface{})
+
+	var logType string
+	if cmd.Params["log_type"] != nil {
+		logType = strconv.Itoa((int)(cmd.Params["log_type"].(float64)))
+		bodyMap["log_type"] = logType
+	}
 
 	//将businessName 加入到body中
-	bodyMap := bodyContent.(map[string]interface{})
 	bodyMap["business_type"] = businessName
+	//if cmd.Params["log_type"] != nil {
+	//    logType:= (int)(cmd.Params["log_type"].(float64))
+	//    bodyMap["log_type"] = logType
+	//}
 
 	body, err := json.Marshal(bodyContent)
 	if nil != err {
 		log.Printf("marshal log body fail %s", err.Error())
-		return businessName, nil
+		return businessName, logType, nil
 	}
 
 	//拼Body
 	flumeBody := fmt.Sprintf("%s\t%s\t%s", momoid, action, string(body))
 	obj := client.NewFlumeEvent()
-	event := client.EventFillUp(obj, businessName, action, []byte(flumeBody))
-	return businessName, event
+	event := client.EventFillUp(obj, businessName+logType, action, []byte(flumeBody))
+	return businessName, logType, event
 }

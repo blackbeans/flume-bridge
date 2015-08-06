@@ -107,15 +107,15 @@ func initRedisQueue(option *config.Option) map[string][]*poolwrapper {
 	//创建redis的消费连接
 	for _, v := range option.QueueHostPorts {
 
+		hp := v
 		pool := redis.NewPool(func() (conn redis.Conn, err error) {
-
-			conn, err = redis.DialTimeout("tcp", v.Host+":"+strconv.Itoa(v.Port),
-				time.Duration(v.Timeout)*time.Second,
-				time.Duration(v.Timeout)*time.Second,
-				time.Duration(v.Timeout)*time.Second)
+			conn, err = redis.DialTimeout("tcp", hp.Host+":"+strconv.Itoa(hp.Port),
+				time.Duration(hp.Timeout)*time.Second,
+				time.Duration(hp.Timeout)*time.Second,
+				time.Duration(hp.Timeout)*time.Second)
 
 			return
-		}, v.Maxconn/2)
+		}, hp.Maxconn/2)
 
 		pools, ok := redispool[v.QueueName]
 		if !ok {
@@ -165,6 +165,16 @@ func (self *SourceManager) initSourceServer(business string, flumenodes []config
 
 	//新增的消费类型
 	//使用的pool
+	pools := self.initFlumeClientPool(business, flumenodes)
+
+	//创建一个sourceserver
+	sourceserver := newSourceServer(business, pools, self.flumeSourceLog)
+
+	return sourceserver
+}
+
+func (self *SourceManager) initFlumeClientPool(business string, flumenodes []config.HostPort) []*pool.FlumePoolLink {
+
 	pools := make([]*pool.FlumePoolLink, 0, 10)
 	for _, hp := range flumenodes {
 		poollink, ok := self.hp2flumeClientPool[hp]
@@ -195,11 +205,9 @@ func (self *SourceManager) initSourceServer(business string, flumenodes []config
 		poollink.AttachBusiness(business)
 		pools = append(pools, poollink)
 	}
+	self.sourceManagerLog.Printf("SOURCE_MANGER|CREATE FLUMECLIENT|SUCCESS|[%s]\n", pools)
 
-	//创建一个sourceserver
-	sourceserver := newSourceServer(business, pools, self.flumeSourceLog)
-	return sourceserver
-
+	return pools
 }
 
 func (self *SourceManager) Start() {
@@ -217,15 +225,14 @@ func (self *SourceManager) Start() {
 func (self *SourceManager) startWorker() {
 
 	for k, v := range self.redispool {
-		self.sourceManagerLog.Println("LOG_SOURCE|REDIS|[" + k + "]|START")
+		self.sourceManagerLog.Println("LOG_SOURCE_MANGER|REDIS|[" + k + "]|START")
 		for _, pool := range v {
-
+			self.sourceManagerLog.Println("LOG_SOURCE_MANGER|REDIS|POOL|[" + pool.hostport.Host + "]|START")
 			for i := 0; i < 10; i++ {
 				go func(queuename string, pool *poolwrapper) {
 					//批量收集数据
 					conn := pool.rpool.Get()
 					defer conn.Close()
-					// defer pool.rpool.Release(conn)
 					for self.isRunning {
 
 						reply, err := conn.Do("LPOP", queuename)
@@ -251,8 +258,7 @@ func (self *SourceManager) startWorker() {
 						if resp == nil {
 							continue
 						}
-
-						businessName, event := decodeCommand(resp)
+						businessName, logType, event := decodeCommand(resp)
 						if nil == event {
 							continue
 						}
@@ -263,10 +269,12 @@ func (self *SourceManager) startWorker() {
 						// }
 
 						//提交到对应business的channel中
-						sourceServer, ok := self.sourceServers[businessName]
+						routeKey := businessName + logType
+						defaultRoutKey := "default" + logType
+						sourceServer, ok := self.sourceServers[routeKey]
 						if !ok {
 							//use the default channel
-							sourceServer, ok := self.sourceServers["default"]
+							sourceServer, ok := self.sourceServers[defaultRoutKey]
 							if ok && nil != sourceServer && !sourceServer.isStop {
 								sourceServer.buffChannel <- event
 							} else {
@@ -276,7 +284,7 @@ func (self *SourceManager) startWorker() {
 							if !sourceServer.isStop {
 								sourceServer.buffChannel <- event
 							} else {
-								self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|SOURCE_SERVER STOPPED|%s\n", businessName)
+								self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|SOURCE_SERVER STOPPED|%s\n", routeKey)
 							}
 						}
 					}
