@@ -72,7 +72,7 @@ func NewSourceManager(instancename string, option *config.Option) *SourceManager
 	sourcemanager.instancename = instancename
 
 	sourcemanager.initSourceServers(option.Businesses, zkmanager)
-	sourcemanager.sourceManagerLog.Printf("SOURCE_MANGER|Init SourceManager|Succ...")
+	sourcemanager.sourceManagerLog.Println("SOURCE_MANGER|Init SourceManager|Succ...")
 	return sourcemanager
 
 }
@@ -215,8 +215,7 @@ func (self *SourceManager) Start() {
 
 	self.sourceManagerLog.Println("SourceManager|Start|Begin...")
 	for _, v := range self.sourceServers {
-		v.start()
-		self.sourceManagerLog.Printf("SourceManager|SourceServer|%s|started...", v.business)
+		go v.start()
 	}
 	self.isRunning = true
 	go self.monitor()
