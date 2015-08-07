@@ -259,10 +259,12 @@ func (self *SourceManager) startWorker() {
 							resp = decompress(resp)
 						}
 						if resp == nil {
+							self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|decompress|%s\n", resp)
 							continue
 						}
 						businessName, logType, event := decodeCommand(resp)
 						if nil == event {
+							self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|decodeCommand|%s\n", event)
 							continue
 						}
 
