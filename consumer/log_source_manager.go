@@ -72,6 +72,7 @@ func NewSourceManager(instancename string, option *config.Option) *SourceManager
 	sourcemanager.instancename = instancename
 
 	sourcemanager.initSourceServers(option.Businesses, zkmanager)
+	sourcemanager.sourceManagerLog.Printf("SOURCE_MANGER|Init SourceManager|Succ...")
 	return sourcemanager
 
 }
@@ -205,20 +206,23 @@ func (self *SourceManager) initFlumeClientPool(business string, flumenodes []con
 		poollink.AttachBusiness(business)
 		pools = append(pools, poollink)
 	}
-	self.sourceManagerLog.Printf("SOURCE_MANGER|CREATE FLUMECLIENT|SUCCESS|[%s]\n", pools)
+	self.sourceManagerLog.Printf("SOURCE_MANGER|CREATE FLUMECLIENT|SUCCESS|[%s,%d]\n", business, len(flumenodes))
 
 	return pools
 }
 
 func (self *SourceManager) Start() {
 
+	self.sourceManagerLog.Println("SourceManager|Start|Begin...")
 	for _, v := range self.sourceServers {
 		v.start()
+		self.sourceManagerLog.Printf("SourceManager|SourceServer|%s|started...", v.business)
 	}
 	self.isRunning = true
 	go self.monitor()
 	self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|[%s]|STARTED\n", self.instancename)
 	self.startWorker()
+	self.sourceManagerLog.Println("SourceManager|Start|End...")
 
 }
 
