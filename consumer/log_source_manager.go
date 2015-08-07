@@ -263,11 +263,6 @@ func (self *SourceManager) startWorker() {
 							continue
 						}
 
-						//大于256个字节记录一下
-						// if len(resp) > 256 {
-						// 	self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|BIG DATA|%s", string(resp))
-						// }
-
 						//提交到对应business的channel中
 						routeKey := businessName + logType
 						defaultRoutKey := "default" + logType
