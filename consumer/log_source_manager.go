@@ -6,6 +6,7 @@ import (
 	"github.com/garyburd/redigo/redis"
 	"github.com/momotech/GoRedis/libs/stdlog"
 	"log"
+	"math/rand"
 	"os"
 	"strconv"
 	"sync"
@@ -254,6 +255,8 @@ func (self *SourceManager) startWorker() {
 					pool.currValue++
 					latch <- 1
 					go func(resp []byte) {
+
+						start := time.Now().Unix()
 						defer func() {
 							<-latch
 						}()
@@ -289,6 +292,12 @@ func (self *SourceManager) startWorker() {
 								self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|SOURCE_SERVER STOPPED|%s\n", routeKey)
 							}
 						}
+
+						end := time.Now().Unix()
+						if rand.Intn(10000) == 0 {
+							self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|Process|Cost:%d\n", end-start)
+						}
+
 					}(reply.([]byte))
 				}
 				self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|REDIS-POP|EXIT|%s|%s\n", queuename, pool.hostport)
