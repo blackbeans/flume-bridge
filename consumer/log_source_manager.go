@@ -226,71 +226,70 @@ func (self *SourceManager) Start() {
 }
 
 func (self *SourceManager) startWorker() {
-
+	//k：queuename v:redis hostport
 	for k, v := range self.redispool {
 		self.sourceManagerLog.Println("LOG_SOURCE_MANGER|REDIS|[" + k + "]|START")
 		for _, pool := range v {
-			self.sourceManagerLog.Println("LOG_SOURCE_MANGER|REDIS|POOL|[" + pool.hostport.Host + "]|START")
-			for i := 0; i < 10; i++ {
-				go func(queuename string, pool *poolwrapper) {
-					//批量收集数据
-					conn := pool.rpool.Get()
-					defer conn.Close()
-					for self.isRunning {
 
-						reply, err := conn.Do("LPOP", queuename)
-						if nil != err || nil == reply {
-							if nil != err {
-								self.sourceManagerLog.Printf("LPOP|FAIL|%T", err)
-								conn.Close()
-								conn = pool.rpool.Get()
-							} else {
-								time.Sleep(100 * time.Millisecond)
-							}
-							continue
-						}
-
-						//计数器++
-						pool.currValue++
-
-						resp := reply.([]byte)
-
-						if self.option.IsCompress {
-							resp = decompress(resp)
-						}
-						if resp == nil {
-							self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|decompress|%s\n", resp)
-							continue
-						}
-						businessName, logType, event := decodeCommand(resp)
-						if nil == event {
-							self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|decodeCommand|%s\n", event)
-							continue
-						}
-
-						//提交到对应business的channel中
-						routeKey := businessName + logType
-						defaultRoutKey := "default" + logType
-						sourceServer, ok := self.sourceServers[routeKey]
-						if !ok {
-							//use the default channel
-							sourceServer, ok := self.sourceServers[defaultRoutKey]
-							if ok && nil != sourceServer && !sourceServer.isStop {
-								sourceServer.buffChannel <- event
-							} else {
-								self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|DEFAULT SOURCE_SERVER NOT EXSIT OR STOPPED\n")
-							}
+			go func(queuename string, pool *poolwrapper) {
+				//批量收集数据
+				conn := pool.rpool.Get()
+				defer conn.Close()
+				self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|REDIS-POP|BEGIN|%s|%s|%s\n", queuename, pool.hostport)
+				for self.isRunning {
+					reply, err := conn.Do("LPOP", queuename)
+					if nil != err || nil == reply {
+						if nil != err {
+							self.sourceManagerLog.Printf("LPOP|FAIL|%T", err)
+							conn.Close()
+							conn = pool.rpool.Get()
 						} else {
-							if !sourceServer.isStop {
-								sourceServer.buffChannel <- event
-							} else {
-								self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|SOURCE_SERVER STOPPED|%s\n", routeKey)
-							}
+							time.Sleep(100 * time.Millisecond)
+						}
+						continue
+					}
+
+					//计数器++
+					pool.currValue++
+
+					resp := reply.([]byte)
+
+					if self.option.IsCompress {
+						resp = decompress(resp)
+					}
+					if resp == nil {
+						self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|decompress|%s\n", resp)
+						continue
+					}
+					businessName, logType, event := decodeCommand(resp)
+					if nil == event {
+						self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|decodeCommand|%s\n", event)
+						continue
+					}
+
+					//提交到对应business的channel中
+					routeKey := businessName + logType
+					defaultRoutKey := "default" + logType
+					sourceServer, ok := self.sourceServers[routeKey]
+					if !ok {
+						//use the default channel
+						sourceServer, ok := self.sourceServers[defaultRoutKey]
+						if ok && nil != sourceServer && !sourceServer.isStop {
+							sourceServer.buffChannel <- event
+						} else {
+							self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|DEFAULT SOURCE_SERVER NOT EXSIT OR STOPPED\n")
+						}
+					} else {
+						if !sourceServer.isStop {
+							sourceServer.buffChannel <- event
+						} else {
+							self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|SOURCE_SERVER STOPPED|%s\n", routeKey)
 						}
 					}
-					self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|REDIS-POP|EXIT|%s|%s\n", queuename, self.instancename)
-				}(k, pool)
-			}
+				}
+				self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|REDIS-POP|EXIT|%s|%s\n", queuename, pool.hostport)
+			}(k, pool)
+
 		}
 	}
 

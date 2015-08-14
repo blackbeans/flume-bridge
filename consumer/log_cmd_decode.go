@@ -13,19 +13,6 @@ import (
 	"strconv"
 )
 
-func decompress(data []byte) []byte {
-	//log.Printf("decompress|INPUT|%T\n", data)
-	r := flate.NewReader(bytes.NewBuffer(data))
-	defer r.Close()
-	ret, err := ioutil.ReadAll(r)
-	if err != nil {
-		log.Printf("command decompress fail ! | error:%s\n", err.Error())
-		return nil
-	}
-	//log.Printf("decompress|OUTPUT|%s\n", string(ret))
-	return ret
-}
-
 //解析出decodecommand
 func decodeCommand(resp []byte) (string, string, *flume.ThriftFlumeEvent) {
 	var cmd config.Command
@@ -94,4 +81,17 @@ func decodeCommand(resp []byte) (string, string, *flume.ThriftFlumeEvent) {
 	obj := client.NewFlumeEvent()
 	event := client.EventFillUp(obj, businessName+logType, action, []byte(flumeBody))
 	return businessName, logType, event
+}
+
+func decompress(data []byte) []byte {
+	//log.Printf("decompress|INPUT|%T\n", data)
+	r := flate.NewReader(bytes.NewBuffer(data))
+	defer r.Close()
+	ret, err := ioutil.ReadAll(r)
+	if err != nil {
+		log.Printf("command decompress fail ! | error:%s\n", err.Error())
+		return nil
+	}
+	//log.Printf("decompress|OUTPUT|%s\n", string(ret))
+	return ret
 }
