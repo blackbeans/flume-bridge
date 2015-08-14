@@ -145,7 +145,7 @@ func (self *SourceServer) transfer() {
 				byteSize += len(event.Body)
 			} else {
 				self.flushChan <- packets
-				packets = make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
+				packets = packets[:0]
 				packets = append(packets, event)
 				byteSize = len(event.Body)
 			}
@@ -153,7 +153,7 @@ func (self *SourceServer) transfer() {
 			//超时如果有数据则直接flush
 			if len(packets) > 0 {
 				self.flushChan <- packets[0:len(packets)]
-				packets = make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
+				packets = packets[:0]
 			}
 			byteSize = 0
 		}
