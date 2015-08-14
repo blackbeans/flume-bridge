@@ -11,7 +11,7 @@ type HostPort struct {
 }
 
 func (self HostPort) String() string {
-	return self.String() + ":" + strconv.Itoa(self.Port)
+	return self.Host + ":" + strconv.Itoa(self.Port)
 }
 
 type QueueHostPort struct {
