@@ -125,19 +125,29 @@ func (self *SourceServer) consume() {
 	}()
 }
 
+const (
+	MAX_THRIFT_PACKET_SIZE = 12 * 1024 * 1024
+)
+
 //转移到消费的channel
 func (self *SourceServer) transfer() {
 	// transfer
+	byteSize := 0
 	tick := time.NewTicker(5 * time.Second)
 	packets := make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
 	for !self.isStop {
 		select {
 		case event := <-self.buffChannel:
-			if len(packets) < self.batchSize {
+			//未达到批量提交的值并且当前的bytesSize 没有到最大THRIFT的包大小则继续append
+			//否则强制提交
+			if len(packets) < self.batchSize && byteSize < MAX_THRIFT_PACKET_SIZE {
 				packets = append(packets, event)
+				byteSize += len(event.Body)
 			} else {
 				self.flushChan <- packets
 				packets = make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
+				packets = append(packets, event)
+				byteSize = len(event.Body)
 			}
 		case <-tick.C:
 			//超时如果有数据则直接flush
@@ -145,6 +155,7 @@ func (self *SourceServer) transfer() {
 				self.flushChan <- packets[0:len(packets)]
 				packets = make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
 			}
+			byteSize = 0
 		}
 	}
 

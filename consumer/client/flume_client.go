@@ -160,5 +160,5 @@ func EventFillUp(obji interface{}, business, action string, body []byte) *flume.
 }
 
 func (self *FlumeClient) HostPort() string {
-	return fmt.Sprintf("[%s:%d-%s]", self.host, self.port, self.status)
+	return fmt.Sprintf("[%s:%d-%d]", self.host, self.port, self.status)
 }
