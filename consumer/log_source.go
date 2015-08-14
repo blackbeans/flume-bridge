@@ -22,7 +22,7 @@ type counter struct {
 }
 
 const (
-	batchSize = 500
+	batchSize = 1000
 )
 
 // 用于向flume中作为sink 通过thrift客户端写入日志
@@ -51,7 +51,7 @@ func newSourceServer(business string, clientPools []*pool.FlumePoolLink, sourceL
 
 	sourceServer.spliteLocal()
 	sourceServer.flushWorkNum = make(chan byte, 10)
-	sourceServer.flushChan = make(chan []*flume.ThriftFlumeEvent, 1000)
+	sourceServer.flushChan = make(chan []*flume.ThriftFlumeEvent, 2000)
 	return sourceServer
 }
 
@@ -128,7 +128,7 @@ func (self *SourceServer) consume() {
 //转移到消费的channel
 func (self *SourceServer) transfer() {
 	// transfer
-	tick := time.NewTicker(500 * time.Millisecond)
+	tick := time.NewTicker(5 * time.Second)
 	packets := make([]*flume.ThriftFlumeEvent, 0, self.batchSize)
 	for !self.isStop {
 		select {
@@ -198,7 +198,7 @@ func (self *SourceServer) flush(events []*flume.ThriftFlumeEvent) {
 
 func (self *SourceServer) stop() {
 	self.isStop = true
-	time.Sleep(5 * time.Second)
+	time.Sleep(1 * time.Second)
 
 	//遍历所有的flumeclientlink，将当前Business从该链表中移除
 	for _, v := range self.clientPools {
