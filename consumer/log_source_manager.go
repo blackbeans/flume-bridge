@@ -237,7 +237,7 @@ func (self *SourceManager) startWorker() {
 				conn := pool.rpool.Get()
 				defer conn.Close()
 				self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|REDIS-POP|BEGIN|%s|%s\n", queuename, pool.hostport)
-				latch := make(chan byte, 10)
+				latch := make(chan byte, 100)
 				for self.isRunning {
 					reply, err := conn.Do("LPOP", queuename)
 					if nil != err || nil == reply {
