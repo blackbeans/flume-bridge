@@ -246,6 +246,7 @@ func (self *SourceManager) startWorker() {
 							conn.Close()
 							conn = pool.rpool.Get()
 						} else {
+							self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|REDIS-POP|Sleep|%s|%s\n", queuename, pool.hostport)
 							time.Sleep(100 * time.Millisecond)
 						}
 						continue
