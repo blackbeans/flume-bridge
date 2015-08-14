@@ -81,7 +81,7 @@ func (self *SourceManager) monitorRedis() {
 		for _, poolw := range v {
 			cost := (poolw.currValue - poolw.lastValue)
 			poolw.lastValue = poolw.currValue
-			monitor += fmt.Sprintf("|%s|%d \t", poolw.hostport.Host+":"+strconv.Itoa((poolw.hostport.Port)), cost)
+			monitor += fmt.Sprintf("|%s|%d \t", poolw.hostport, cost)
 		}
 	}
 	self.redisLog.Println(monitor)

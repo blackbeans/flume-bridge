@@ -236,6 +236,7 @@ func (self *SourceManager) startWorker() {
 				conn := pool.rpool.Get()
 				defer conn.Close()
 				self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|REDIS-POP|BEGIN|%s|%s\n", queuename, pool.hostport)
+				latch := make(chan byte, 10)
 				for self.isRunning {
 					reply, err := conn.Do("LPOP", queuename)
 					if nil != err || nil == reply {
@@ -251,41 +252,44 @@ func (self *SourceManager) startWorker() {
 
 					//计数器++
 					pool.currValue++
-
-					resp := reply.([]byte)
-
-					if self.option.IsCompress {
-						resp = decompress(resp)
-					}
-					if resp == nil {
-						self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|decompress|%s\n", resp)
-						continue
-					}
-					businessName, logType, event := decodeCommand(resp)
-					if nil == event {
-						self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|decodeCommand|%s\n", event)
-						continue
-					}
-
-					//提交到对应business的channel中
-					routeKey := businessName + logType
-					defaultRoutKey := "default" + logType
-					sourceServer, ok := self.sourceServers[routeKey]
-					if !ok {
-						//use the default channel
-						sourceServer, ok := self.sourceServers[defaultRoutKey]
-						if ok && nil != sourceServer && !sourceServer.isStop {
-							sourceServer.buffChannel <- event
-						} else {
-							self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|DEFAULT SOURCE_SERVER NOT EXSIT OR STOPPED\n")
+					latch <- 1
+					go func(resp []byte) {
+						defer func() {
+							<-latch
+						}()
+						if self.option.IsCompress {
+							resp = decompress(resp)
 						}
-					} else {
-						if !sourceServer.isStop {
-							sourceServer.buffChannel <- event
-						} else {
-							self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|SOURCE_SERVER STOPPED|%s\n", routeKey)
+						if resp == nil {
+							self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|decompress|%s\n", resp)
+							return
 						}
-					}
+						businessName, logType, event := decodeCommand(resp)
+						if nil == event {
+							self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|decodeCommand|%s\n", event)
+							return
+						}
+
+						//提交到对应business的channel中
+						routeKey := businessName + logType
+						defaultRoutKey := "default" + logType
+						sourceServer, ok := self.sourceServers[routeKey]
+						if !ok {
+							//use the default channel
+							sourceServer, ok := self.sourceServers[defaultRoutKey]
+							if ok && nil != sourceServer && !sourceServer.isStop {
+								sourceServer.buffChannel <- event
+							} else {
+								self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|DEFAULT SOURCE_SERVER NOT EXSIT OR STOPPED\n")
+							}
+						} else {
+							if !sourceServer.isStop {
+								sourceServer.buffChannel <- event
+							} else {
+								self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|SOURCE_SERVER STOPPED|%s\n", routeKey)
+							}
+						}
+					}(reply.([]byte))
 				}
 				self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|REDIS-POP|EXIT|%s|%s\n", queuename, pool.hostport)
 			}(k, pool)

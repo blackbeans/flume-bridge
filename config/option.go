@@ -10,6 +10,10 @@ type HostPort struct {
 	Port int
 }
 
+func (self HostPort) String() string {
+	return self.String() + ":" + strconv.Itoa(self.Port)
+}
+
 type QueueHostPort struct {
 	HostPort
 
