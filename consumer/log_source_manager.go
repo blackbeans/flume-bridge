@@ -256,7 +256,7 @@ func (self *SourceManager) startWorker() {
 					latch <- 1
 					go func(resp []byte) {
 
-						start := time.Now().Unix()
+						start := time.Now().UnixNano()
 						defer func() {
 							<-latch
 						}()
@@ -293,8 +293,8 @@ func (self *SourceManager) startWorker() {
 							}
 						}
 
-						end := time.Now().Unix()
-						if rand.Intn(10000) == 0 {
+						end := time.Now().UnixNano()
+						if rand.Intn(1000) == 0 {
 							self.sourceManagerLog.Printf("LOG_SOURCE_MANGER|Process|Cost:%d\n", end-start)
 						}
 

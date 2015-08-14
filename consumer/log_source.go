@@ -157,6 +157,7 @@ func (self *SourceServer) transfer() {
 
 func (self *SourceServer) flush(events []*flume.ThriftFlumeEvent) {
 
+	start := time.Now().UnixNano()
 	pool := self.getFlumeClientPool()
 	if nil == pool {
 		self.sourceLog.Printf("LOG_SOURCE|GET FLUMECLIENTPOOL|FAIL|%s\n", self.business)
@@ -185,9 +186,13 @@ func (self *SourceServer) flush(events []*flume.ThriftFlumeEvent) {
 			self.business, flumeclient.HostPort(), err.Error())
 	} else {
 		atomic.AddInt64(&self.monitorCount.currSuccValue, int64(1*self.batchSize))
-		if rand.Int()%10000 == 0 {
-			self.sourceLog.Printf("trace|send 2 flume succ|%s|%d\n", flumeclient.HostPort(), len(events))
-		}
+
+	}
+
+	end := time.Now().UnixNano()
+	if rand.Intn(1000) == 0 {
+		self.sourceLog.Printf("LOG_SOURCE|SEND FLUME|COST|%s|%s|cost:%d\n",
+			self.business, flumeclient.HostPort(), end-start)
 	}
 }
 
