@@ -20,7 +20,7 @@ type FlumePoolLink struct {
 }
 
 func NewFlumePoolLink(hp config.HostPort) (error, *FlumePoolLink) {
-	err, pool := newFlumeClientPool(hp, 10, 30, 50, 10*time.Second, func() (error, *client.FlumeClient) {
+	err, pool := newFlumeClientPool(hp, 10, 10, 20, 10*time.Minute, func() (error, *client.FlumeClient) {
 		flumeclient := client.NewFlumeClient(hp.Host, hp.Port)
 		err := flumeclient.Connect()
 		return err, flumeclient
@@ -136,7 +136,7 @@ func newFlumeClientPool(hostport config.HostPort, minPoolSize, corepoolSize,
 		clientpool.poolSize++
 	}
 	//启动链接过期
-	go clientpool.evict()
+	// go clientpool.evict()
 	return nil, clientpool
 }
 
